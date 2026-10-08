@@ -1,0 +1,6 @@
+dist
+coverage
+package-lock.json
+screenshots
+apps/server/data
+dist-types

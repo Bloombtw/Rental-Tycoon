@@ -1,0 +1,24 @@
+/* Design tokens — flat top-down style. Use these, never raw hex values in components. */
+:root {
+  --c-asphalt: #2b2d42;
+  --c-road: #3d405b;
+  --c-grass: #81b29a;
+  --c-sand: #f4f1de;
+  --c-accent: #e07a5f;
+  --c-accent-2: #f2cc8f;
+  --c-money: #3fa34d;
+  --c-danger: #d62839;
+  --c-ink: #1b1b1e;
+  --radius: 14px;
+  --shadow: 0 6px 0 rgb(0 0 0 / 0.15);
+  --font: "Inter", system-ui, sans-serif;
+  font-family: var(--font);
+  color: var(--c-ink);
+  background: var(--c-sand);
+}
+body {
+  margin: 0;
+}
+.app {
+  padding: 24px;
+}
