@@ -2,6 +2,16 @@
 
 Tycoon en vue de dessus : gère ton agence de location de voitures.
 
+**Jouer en ligne :** https://bloombtw.github.io/Rental-Tycoon/
+
+## Installer sur iPhone
+
+1. Ouvre le lien ci-dessus dans **Safari**.
+2. Bouton **Partager** → **Sur l'écran d'accueil**.
+3. Le jeu s'ouvre en plein écran depuis son icône et fonctionne hors ligne.
+
+(Sur Android/Chrome : menu ⋮ → **Installer l'application**.)
+
 ## Lancer
 
 ```bash

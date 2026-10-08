@@ -31,10 +31,13 @@ Dependency direction: `web → sim`, `server → sim`. `sim` imports nothing fro
 - **Design tokens** from `apps/web/src/styles/tokens.css`; no raw hex in components.
 - TypeScript strict (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`). No `any`, no `@ts-ignore`.
 - UI text in French; code, identifiers and comments in English.
+- **Mobile first (iPhone, portrait)**: the game is a PWA played mostly on a phone. Design for a 390 px wide portrait screen first, touch controls (tap, drag to pan, pinch to zoom; no hover-only info), tap targets ≥ 44 px, respect safe areas (`env(safe-area-inset-*)`). Desktop must still work.
+- **Runs fully in the browser**: the deployed game is static (GitHub Pages), with no server. Game state lives client-side (saves in `localStorage`, from `apps/web`, never from `sim`). `apps/server` is optional extras only (e.g. leaderboard); the game must never depend on it to be playable.
 
 ## Commands
 
 - `npm run dev`: server :3001 + web :5173
+- `npm run build -w @rt/web`: production build with the PWA service worker (`apps/web/dist`)
 - `npm run check`: format, lint, typecheck, tests (same as CI)
 - `npx vitest run --project sim|server|web`: one package's tests
 
@@ -43,3 +46,4 @@ Dependency direction: `web → sim`, `server → sim`. `sim` imports nothing fro
 - PostToolUse hook: prettier + eslint --fix on every edited file; leftover lint errors are fed back to the agent.
 - Stop hook: typecheck + tests must pass before the lead finishes a turn.
 - Pre-commit (husky + lint-staged), and GitHub Actions CI runs `npm run check` + build.
+- Every push to `main` deploys the PWA to GitHub Pages (`.github/workflows/deploy.yml`).
