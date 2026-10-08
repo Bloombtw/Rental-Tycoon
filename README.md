@@ -37,7 +37,7 @@ Le jeu est construit par une équipe d'agents Claude Code. Voir `CLAUDE.md` et `
 | `game-designer`           | specs et équilibrage                   | `docs/`             |
 | `sim-engineer`            | règles du jeu, simulation pure         | `packages/sim/`     |
 | `backend-engineer`        | API, auth, sauvegardes                 | `apps/server/`      |
-| `frontend-engineer`       | UI React + rendu PixiJS                | `apps/web/`         |
+| `frontend-engineer`       | UI React + rendu 3D Three.js           | `apps/web/`         |
 | `qa-breaker`              | essaie de tout casser, écrit des tests | `*.test.ts`, `e2e/` |
 | `reviewer`                | revue avant merge                      | lecture seule       |
 

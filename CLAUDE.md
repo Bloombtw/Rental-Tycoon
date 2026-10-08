@@ -4,14 +4,14 @@ Top-down tycoon game (flat modern style) where the player runs a car rental agen
 
 ## Stack and layout (npm workspaces)
 
-| Path                                        | What                                                       | Owner agent         |
-| ------------------------------------------- | ---------------------------------------------------------- | ------------------- |
-| `packages/sim`                              | Pure, deterministic game simulation (TS)                   | `sim-engineer`      |
-| `apps/server`                               | Fastify API, auth, saves, leaderboard (`node:sqlite`, zod) | `backend-engineer`  |
-| `apps/web`                                  | Vite + React (HUD/menus) + PixiJS v8 (city view)           | `frontend-engineer` |
-| `docs/specs`                                | Feature specs                                              | `game-designer`     |
-| `**/*.test.ts`, `e2e/`                      | Adversarial tests                                          | `qa-breaker`        |
-| `.claude/`, `.github/`, `.husky/`, lockfile | Harness: humans only                                       | —                   |
+| Path                                        | What                                                         | Owner agent         |
+| ------------------------------------------- | ------------------------------------------------------------ | ------------------- |
+| `packages/sim`                              | Pure, deterministic game simulation (TS)                     | `sim-engineer`      |
+| `apps/server`                               | Fastify API, auth, saves, leaderboard (`node:sqlite`, zod)   | `backend-engineer`  |
+| `apps/web`                                  | Vite + React (HUD/menus) + Three.js (3D isometric city view) | `frontend-engineer` |
+| `docs/specs`                                | Feature specs                                                | `game-designer`     |
+| `**/*.test.ts`, `e2e/`                      | Adversarial tests                                            | `qa-breaker`        |
+| `.claude/`, `.github/`, `.husky/`, lockfile | Harness: humans only                                         | —                   |
 
 Dependency direction: `web → sim`, `server → sim`. `sim` imports nothing from the apps.
 

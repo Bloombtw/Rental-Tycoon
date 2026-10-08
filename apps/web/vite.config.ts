@@ -28,6 +28,14 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,woff2}"],
         navigateFallbackDenylist: [/^\/api\//],
+        // 3D models (Kenney kits): cached on first use rather than precached, since most are unused.
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/.+\.glb$/,
+            handler: "CacheFirst",
+            options: { cacheName: "models", expiration: { maxEntries: 400 } },
+          },
+        ],
       },
     }),
   ],
