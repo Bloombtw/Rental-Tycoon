@@ -1,11 +1,14 @@
 import { departureMinute, returnMinute } from "@rt/sim";
 import { planeToScreen, type Camera, type ScreenRect } from "./camera.js";
 import { toViewPlane } from "./iso.js";
-import { exitPath, returnPath, type AgencyLayout, type GroundPoint, type Vec } from "./layout.js";
+import type { AgencyLayout, GroundPoint, Vec } from "./layout.js";
+import type { CarRoutes } from "./routes.js";
 
-/** Car schedule and motion as pure functions of time (spec 2.3). No three, no DOM. */
+/** Car schedule and motion as pure functions of time (spec 2.2). No three, no DOM. */
 
-export const DRIVE_MINUTES = 30;
+export const DRIVE_MINUTES = 60;
+/** Fraction of the trip time spent speeding up (departure) or braking (return). */
+export const RAMP = 0.25;
 /** Minimum touch target, in screen pixels. */
 export const MIN_TOUCH_PX = 44;
 /** Distance (world units) on each side of a path corner over which the heading is blended. */
@@ -38,6 +41,18 @@ function fin(n: unknown): n is number {
 export function easeInOutQuad(p: number): number {
   const x = Math.min(1, Math.max(0, p));
   return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+}
+
+/** Fraction of distance covered at fraction `p` of the time: soft start, then constant speed. */
+export function easeInCruise(p: number): number {
+  const x = fin(p) ? Math.min(1, Math.max(0, p)) : 0;
+  return x < RAMP ? (x * x) / (RAMP * (2 - RAMP)) : (2 * x - RAMP) / (2 - RAMP);
+}
+
+/** Constant speed, then braking: the mirror of easeInCruise. */
+export function cruiseEaseOut(p: number): number {
+  const x = fin(p) ? Math.min(1, Math.max(0, p)) : 0;
+  return 1 - easeInCruise(1 - x);
 }
 
 export function carPhaseAt(
@@ -92,6 +107,32 @@ function buildSegments(
   return segs;
 }
 
+const segmentCache = new WeakMap<
+  readonly GroundPoint[],
+  Map<string, { segs: Segment[]; total: number }>
+>();
+
+/** Routes are immutable and reused every frame: build their segments once. */
+function cachedSegments(
+  path: readonly GroundPoint[],
+  reverseFirst: boolean,
+  parkLast: boolean,
+): { segs: Segment[]; total: number } {
+  let byFlags = segmentCache.get(path);
+  if (!byFlags) {
+    byFlags = new Map();
+    segmentCache.set(path, byFlags);
+  }
+  const flags = `${reverseFirst ? "r" : "-"}${parkLast ? "p" : "-"}`;
+  let entry = byFlags.get(flags);
+  if (!entry) {
+    const segs = buildSegments(path, reverseFirst, parkLast);
+    entry = { segs, total: segs.reduce((sum, s) => sum + s.len, 0) };
+    byFlags.set(flags, entry);
+  }
+  return entry;
+}
+
 function angleDiff(from: number, to: number): number {
   let d = (to - from) % (2 * Math.PI);
   if (d > Math.PI) d -= 2 * Math.PI;
@@ -114,10 +155,9 @@ function along(
   reverseFirst: boolean,
   parkLast: boolean,
 ): Along {
-  const segs = buildSegments(path, reverseFirst, parkLast);
+  const { segs, total } = cachedSegments(path, reverseFirst, parkLast);
   const start = path[0] ?? { x: 0, z: 0 };
   if (segs.length === 0) return { x: start.x, z: start.z, heading: PARKED_HEADING, distance: 0 };
-  const total = segs.reduce((sum, s) => sum + s.len, 0);
   let d = Math.min(1, Math.max(0, p)) * total;
   let travelled = 0;
   for (let k = 0; k < segs.length; k++) {
@@ -158,6 +198,7 @@ const HIDDEN: CarPose = Object.freeze({
 
 export function carPoseAt(
   layout: AgencyLayout,
+  routes: CarRoutes,
   index: number,
   rented: unknown,
   timeOfDay: number,
@@ -178,33 +219,34 @@ export function carPoseAt(
 
   const dep = departureMinute(index) ?? 0;
   const ret = returnMinute(index) ?? 0;
+  const out = routes.departure[index];
+  const back = routes.arrival[index];
   if (phase === "away") {
-    const out = exitPath(layout, index);
-    const end = out[out.length - 1];
+    const end = out?.[out.length - 1];
     return { ...parked, x: end?.x ?? spot.x, z: end?.z ?? spot.z, alpha: 0 };
   }
   if (phase === "departing") {
+    if (!out) return parked;
     const p = (timeOfDay - dep) / DRIVE_MINUTES;
-    const a = along(exitPath(layout, index), easeInOutQuad(p), true, false);
-    const alpha = p < 0.75 ? 1 : Math.max(0, (1 - p) / 0.25);
+    const a = along(out, easeInCruise(p), true, false);
     return {
       x: a.x,
       z: a.z,
       heading: a.heading,
       wheelRotation: a.distance / WHEEL_RADIUS,
-      alpha,
+      alpha: 1,
       phase,
     };
   }
+  if (!back) return parked;
   const p = (timeOfDay - (ret - DRIVE_MINUTES)) / DRIVE_MINUTES;
-  const a = along(returnPath(layout, index), easeInOutQuad(p), false, true);
-  const alpha = p < 0.25 ? Math.max(0, p / 0.25) : 1;
+  const a = along(back, cruiseEaseOut(p), false, true);
   return {
     x: a.x,
     z: a.z,
     heading: a.heading,
     wheelRotation: a.distance / WHEEL_RADIUS,
-    alpha,
+    alpha: 1,
     phase,
   };
 }

@@ -30,9 +30,33 @@ describe("module boundaries (acceptance 20)", () => {
     expect(all.some((f) => f.endsWith("scene/AgencyScene.ts"))).toBe(false);
   });
 
-  it("only scene/AgencyScene3D.ts imports three", () => {
-    const users = code.filter((f) => imports(read(f)).some((i) => /^three(\/|$)/.test(i)));
-    expect(users.map((f) => f.replace(/^.*src\//, ""))).toEqual(["scene/AgencyScene3D.ts"]);
+  it("only scene/AgencyScene3D.ts and scene/gl/*.ts import three", () => {
+    const users = code
+      .filter((f) => imports(read(f)).some((i) => /^three(\/|$)/.test(i)))
+      .map((f) => f.replace(/^.*src\//, ""));
+    expect(users).toContain("scene/AgencyScene3D.ts");
+    for (const u of users) expect(u, u).toMatch(/^scene\/(AgencyScene3D\.ts|gl\/[^/]+\.ts)$/);
+  });
+
+  it("the three.js glue (scene/gl) is reached only from AgencyScene3D and itself", () => {
+    const offenders = code.filter(
+      (f) =>
+        !/scene\/(AgencyScene3D\.ts|gl\/)/.test(f.replace(/\\/g, "/")) &&
+        imports(read(f)).some((i) => /(^|\/)gl\//.test(i)),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("the pure city-life modules never use Math.random, clocks or the sim's rng", () => {
+    for (const name of ["prng", "cityPlan", "paths", "routes", "traffic", "lighting", "quality"]) {
+      const f = code.find((x) => x.replace(/\\/g, "/").endsWith(`scene/${name}.ts`)) ?? "";
+      expect(f, name).not.toBe("");
+      const text = read(f)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      expect(text, name).not.toMatch(/Math\.random|Date\.now|performance\.now|new Date\b/);
+      expect(text, name).not.toMatch(/createRng|\/rng["']/);
+    }
   });
 
   it("AgencyScene3D is only ever loaded with a dynamic import or as a type", () => {
@@ -47,7 +71,21 @@ describe("module boundaries (acceptance 20)", () => {
   });
 
   it("pure scene modules import neither three nor the DOM scene", () => {
-    for (const name of ["layout", "iso", "camera", "carMotion", "assets", "palette"]) {
+    for (const name of [
+      "layout",
+      "iso",
+      "camera",
+      "carMotion",
+      "assets",
+      "palette",
+      "prng",
+      "cityPlan",
+      "paths",
+      "routes",
+      "traffic",
+      "lighting",
+      "quality",
+    ]) {
       const f = code.find((x) => x.endsWith(`scene/${name}.ts`)) ?? "";
       expect(f, name).not.toBe("");
       expect(

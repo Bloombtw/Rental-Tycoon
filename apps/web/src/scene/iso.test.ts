@@ -4,8 +4,11 @@ import {
   CAMERA_AZIMUTH,
   CAMERA_DISTANCE,
   CAMERA_ELEVATION,
+  RECEIVER_HEIGHT,
   SHADOW_MARGIN,
   cameraRig,
+  groundPointOnScreen,
+  lightBasis,
   projectedBounds,
   shadowFrustum,
   toViewPlane,
@@ -27,7 +30,8 @@ describe("constants", () => {
     expect(CAMERA_AZIMUTH).toBeCloseTo(Math.PI / 6, 12);
     expect(CAMERA_ELEVATION).toBeCloseTo(Math.PI / 4, 12);
     expect(CAMERA_DISTANCE).toBe(200);
-    expect(SHADOW_MARGIN).toBe(10);
+    expect(SHADOW_MARGIN).toBe(6);
+    expect(RECEIVER_HEIGHT).toBe(12);
   });
 });
 
@@ -245,40 +249,97 @@ describe("cameraRig", () => {
 });
 
 describe("shadowFrustum", () => {
-  it("covers the four screen corners projected on the ground, plus the margin", () => {
-    const f = shadowFrustum(CAM, VIEW);
-    expect(f.halfExtent).toBeGreaterThan(0);
-    const corners = [
-      [VIEW.x, VIEW.y],
-      [VIEW.x + VIEW.width, VIEW.y],
-      [VIEW.x, VIEW.y + VIEW.height],
-      [VIEW.x + VIEW.width, VIEW.y + VIEW.height],
-    ] as const;
-    for (const [sx, sy] of corners) {
-      const plane = {
-        x: CAM.centerX + (sx - VIEW.x - VIEW.width / 2) / CAM.zoom,
-        y: CAM.centerY + (sy - VIEW.y - VIEW.height / 2) / CAM.zoom,
-      };
-      const g = viewPlaneToGround(plane);
-      expect(g).not.toBeNull();
-      if (!g) continue;
-      expect(Math.abs(g.x - f.center.x)).toBeLessThanOrEqual(f.halfExtent - SHADOW_MARGIN + 1e-6);
-      expect(Math.abs(g.z - f.center.z)).toBeLessThanOrEqual(f.halfExtent - SHADOW_MARGIN + 1e-6);
+  const dot = (a: Point3, b: Point3) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const sunAt = (azDeg: number, elDeg: number): Point3 => {
+    const az = (azDeg * Math.PI) / 180;
+    const el = (elDeg * Math.PI) / 180;
+    return { x: Math.sin(az) * Math.cos(el), y: Math.sin(el), z: -Math.cos(az) * Math.cos(el) };
+  };
+  /** The 8 points the spec says must be covered: screen corners on y = 0 and y = RECEIVER_HEIGHT. */
+  const covered = (cam: Camera, view: ScreenRect): Point3[] => {
+    const out: Point3[] = [];
+    for (const sx of [view.x, view.x + view.width]) {
+      for (const sy of [view.y, view.y + view.height]) {
+        const plane = {
+          x: cam.centerX + (sx - view.x - view.width / 2) / cam.zoom,
+          y: cam.centerY + (sy - view.y - view.height / 2) / cam.zoom,
+        };
+        for (const y of [0, RECEIVER_HEIGHT]) {
+          const g = viewPlaneToGround(plane, y);
+          if (g) out.push({ x: g.x, y, z: g.z });
+        }
+      }
+    }
+    return out;
+  };
+  const VIEWS: ScreenRect[] = [
+    VIEW,
+    { x: 0, y: 0, width: 390, height: 844 },
+    { x: 0, y: 0, width: 1280, height: 800 },
+    { x: 0, y: 0, width: 2560, height: 1080 },
+  ];
+  const CAMS: Camera[] = [
+    CAM,
+    { zoom: 0.5, centerX: -40, centerY: 70 },
+    { zoom: 2, centerX: 0, centerY: 0 },
+    { zoom: 15, centerX: 30, centerY: -10 },
+    { zoom: 40, centerX: 5, centerY: 5 },
+  ];
+
+  it("covers the 8 projected screen corners in the light's axes at every zoom and sun direction", () => {
+    for (const view of VIEWS) {
+      for (const cam of CAMS) {
+        const pts = covered(cam, view);
+        expect(pts).toHaveLength(8);
+        for (let az = 100; az <= 290; az += 30) {
+          for (const el of [12, 30, 60]) {
+            const sun = sunAt(az, el);
+            const f = shadowFrustum(cam, view, sun);
+            const { right, up } = lightBasis(sun);
+            expect(finite(f.center.x, f.center.z, f.halfWidth, f.halfHeight)).toBe(true);
+            expect(f.halfWidth).toBeGreaterThan(0);
+            expect(f.halfHeight).toBeGreaterThan(0);
+            expect(f.up.x).toBeCloseTo(up.x, 9);
+            expect(f.up.y).toBeCloseTo(up.y, 9);
+            expect(f.up.z).toBeCloseTo(up.z, 9);
+            const c: Point3 = { x: f.center.x, y: 0, z: f.center.z };
+            for (const p of pts) {
+              const d = { x: p.x - c.x, y: p.y - c.y, z: p.z - c.z };
+              expect(Math.abs(dot(d, right))).toBeLessThanOrEqual(f.halfWidth + 1e-6);
+              expect(Math.abs(dot(d, up))).toBeLessThanOrEqual(f.halfHeight + 1e-6);
+            }
+          }
+        }
+      }
     }
   });
 
   it("grows when zooming out and keeps a margin even at max zoom", () => {
-    const far = shadowFrustum({ ...CAM, zoom: 2 }, VIEW);
-    const near = shadowFrustum({ ...CAM, zoom: 40 }, VIEW);
-    expect(far.halfExtent).toBeGreaterThan(near.halfExtent);
-    expect(near.halfExtent).toBeGreaterThanOrEqual(SHADOW_MARGIN);
+    const sun = sunAt(160, 55);
+    const far = shadowFrustum({ ...CAM, zoom: 2 }, VIEW, sun);
+    const near = shadowFrustum({ ...CAM, zoom: 40 }, VIEW, sun);
+    expect(far.halfWidth).toBeGreaterThan(near.halfWidth);
+    expect(far.halfHeight).toBeGreaterThan(near.halfHeight);
+    expect(near.halfWidth).toBeGreaterThanOrEqual(SHADOW_MARGIN);
+    expect(near.halfHeight).toBeGreaterThanOrEqual(SHADOW_MARGIN);
   });
 
-  it("follows the camera centre", () => {
-    const f1 = shadowFrustum(CAM, VIEW);
-    const f2 = shadowFrustum({ ...CAM, centerX: CAM.centerX + 20 }, VIEW);
-    expect(f2.center.x).not.toBeCloseTo(f1.center.x, 3);
-    expect(f2.halfExtent).toBeCloseTo(f1.halfExtent, 6);
+  it("follows the camera centre without changing the size", () => {
+    const sun = sunAt(115, 30);
+    const f1 = shadowFrustum(CAM, VIEW, sun);
+    const f2 = shadowFrustum({ ...CAM, centerX: CAM.centerX + 20 }, VIEW, sun);
+    expect(Math.hypot(f2.center.x - f1.center.x, f2.center.z - f1.center.z)).toBeGreaterThan(1);
+    expect(f2.halfWidth).toBeCloseTo(f1.halfWidth, 6);
+    expect(f2.halfHeight).toBeCloseTo(f1.halfHeight, 6);
+  });
+
+  it("a low sun needs a longer frustum than a high one (tall receivers)", () => {
+    const low = shadowFrustum(CAM, VIEW, sunAt(250, 12));
+    const high = shadowFrustum(CAM, VIEW, sunAt(160, 60));
+    expect(low.halfWidth * low.halfHeight).toBeGreaterThan(0);
+    expect(Math.max(low.halfWidth, low.halfHeight)).toBeGreaterThan(
+      Math.min(high.halfWidth, high.halfHeight),
+    );
   });
 
   it.each([
@@ -294,9 +355,102 @@ describe("shadowFrustum", () => {
   ] as [Camera, ScreenRect][])(
     "hostile camera / view %j %j stays finite and positive",
     (cam, view) => {
-      const f = shadowFrustum(cam, view);
-      expect(finite(f.center.x, f.center.z, f.halfExtent)).toBe(true);
-      expect(f.halfExtent).toBeGreaterThan(0);
+      const f = shadowFrustum(cam, view, sunAt(160, 55));
+      expect(finite(f.center.x, f.center.z, f.halfWidth, f.halfHeight)).toBe(true);
+      expect(f.halfWidth).toBeGreaterThan(0);
+      expect(f.halfHeight).toBeGreaterThan(0);
     },
   );
+});
+
+describe("lightBasis", () => {
+  it("is orthonormal and follows right = Y x sun, up = sun x right", () => {
+    for (let az = 0; az < 360; az += 25) {
+      for (const el of [12, 30, 60, 85]) {
+        const az0 = (az * Math.PI) / 180;
+        const el0 = (el * Math.PI) / 180;
+        const s = {
+          x: Math.sin(az0) * Math.cos(el0),
+          y: Math.sin(el0),
+          z: -Math.cos(az0) * Math.cos(el0),
+        };
+        const { right, up } = lightBasis(s);
+        const d = (a: Point3, b: Point3) => a.x * b.x + a.y * b.y + a.z * b.z;
+        expect(d(right, right)).toBeCloseTo(1, 9);
+        expect(d(up, up)).toBeCloseTo(1, 9);
+        expect(d(right, up)).toBeCloseTo(0, 9);
+        expect(d(right, s)).toBeCloseTo(0, 9);
+        expect(d(up, s)).toBeCloseTo(0, 9);
+        expect(right.y).toBeCloseTo(0, 9);
+        expect(up.y).toBeGreaterThan(0);
+        expect(right.x).toBeCloseTo(s.z / Math.hypot(s.x, s.z), 9);
+        expect(right.z).toBeCloseTo(-s.x / Math.hypot(s.x, s.z), 9);
+      }
+    }
+  });
+
+  it("sun due east at 45 degrees: right is north (-z), up leans west", () => {
+    const k = Math.SQRT1_2;
+    const { right, up } = lightBasis({ x: k, y: k, z: 0 });
+    expect([right.x, right.y, right.z].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([0, 0, -1]);
+    expect(up.x).toBeCloseTo(-k, 9);
+    expect(up.y).toBeCloseTo(k, 9);
+    expect(up.z).toBeCloseTo(0, 9);
+  });
+});
+
+describe("groundPointOnScreen", () => {
+  const cam: Camera = { zoom: 10, centerX: 0, centerY: 0 };
+  const screenOf = (p: Point3) => {
+    const v = toViewPlane(p);
+    return {
+      x: VIEW.x + VIEW.width / 2 + (v.x - cam.centerX) * cam.zoom,
+      y: VIEW.y + VIEW.height / 2 + (v.y - cam.centerY) * cam.zoom,
+    };
+  };
+  it("agrees with an independent projection, with and without margin", () => {
+    let checked = 0;
+    for (let x = -80; x <= 80; x += 7) {
+      for (let z = -80; z <= 80; z += 7) {
+        for (const y of [0, 1.6, 12]) {
+          const p = { x, y, z };
+          const s = screenOf(p);
+          for (const m of [0, 40]) {
+            const dx = Math.min(s.x - (VIEW.x - m), VIEW.x + VIEW.width + m - s.x);
+            const dy = Math.min(s.y - (VIEW.y - m), VIEW.y + VIEW.height + m - s.y);
+            const edge = Math.min(Math.abs(dx), Math.abs(dy));
+            if (edge < 1e-6) continue;
+            expect(groundPointOnScreen(cam, VIEW, p, m)).toBe(dx > 0 && dy > 0);
+            checked++;
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(1000);
+  });
+
+  it("the margin makes a point just off screen count as on screen", () => {
+    const p = { x: 0, y: 0, z: 0 };
+    const v = toViewPlane(p);
+    // Puts the point 20 px beyond the right edge of the view.
+    const shifted: Camera = {
+      zoom: cam.zoom,
+      centerX: v.x - (VIEW.width / 2 + 20) / cam.zoom,
+      centerY: v.y,
+    };
+    expect(groundPointOnScreen(shifted, VIEW, p, 0)).toBe(false);
+    expect(groundPointOnScreen(shifted, VIEW, p, 40)).toBe(true);
+    expect(groundPointOnScreen(shifted, VIEW, p, 10)).toBe(false);
+  });
+
+  it("hostile point, margin or camera never throws and never says yes to garbage", () => {
+    expect(groundPointOnScreen(cam, VIEW, { x: NaN, y: 0, z: 0 }, 0)).toBe(false);
+    expect(groundPointOnScreen(cam, VIEW, { x: 0, y: Infinity, z: 0 }, 0)).toBe(false);
+    expect(groundPointOnScreen({ ...cam, zoom: NaN }, VIEW, { x: 0, y: 0, z: 0 }, 0)).toBe(false);
+    expect(groundPointOnScreen({ ...cam, zoom: 0 }, VIEW, { x: 0, y: 0, z: 0 }, 0)).toBe(false);
+    for (const m of [NaN, Infinity, -Infinity, -5, 1e12]) {
+      expect(typeof groundPointOnScreen(cam, VIEW, { x: 0, y: 0, z: 0 }, m)).toBe("boolean");
+    }
+    expect(groundPointOnScreen(cam, VIEW, { x: 1e6, y: 0, z: 1e6 }, NaN)).toBe(false);
+  });
 });

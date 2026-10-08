@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { MAX_FLEET_SIZE } from "@rt/sim";
+import * as layoutModule from "./layout";
 import {
   AISLE_D,
   AGENCY_HEIGHT,
-  DECOR_RING_TILES,
   LANE_OFFSET,
   LOT_PAD,
-  ROAD_EXTEND_TILES,
   SPOT_D,
   SPOT_W,
   TILE,
@@ -67,7 +66,14 @@ const within = (outer: GroundRect, p: GroundPoint) =>
 describe("constants and tileCenter", () => {
   it("match the spec table", () => {
     expect([TILE, SPOT_W, SPOT_D, AISLE_D, LOT_PAD, LANE_OFFSET]).toEqual([6, 3, 5, 7, 0.75, 1.5]);
-    expect([ROAD_EXTEND_TILES, DECOR_RING_TILES, AGENCY_HEIGHT]).toEqual([8, 3, 9]);
+    expect(AGENCY_HEIGHT).toBe(9);
+  });
+
+  it("the city-life removals are really gone", () => {
+    for (const gone of ["ROAD_EXTEND_TILES", "DECOR_RING_TILES"]) {
+      expect(gone in layoutModule, gone).toBe(false);
+    }
+    expect("exitEndX" in computeLayout(5, PORTRAIT)).toBe(false);
   });
 
   it.each([
@@ -177,7 +183,6 @@ describe("computeLayout", () => {
       expect(l.exitLaneX).toBeCloseTo((l.lotCols - 0.5) * TILE, 9);
       expect(l.laneOutZ).toBeCloseTo((l.streetRow + 0.5) * TILE + LANE_OFFSET, 9);
       expect(l.laneInZ).toBeCloseTo((l.streetRow + 0.5) * TILE - LANE_OFFSET, 9);
-      expect(l.exitEndX).toBeCloseTo((l.lotCols + ROAD_EXTEND_TILES + 0.5) * TILE, 9);
       for (const s of l.spots) expect(s.x).toBeLessThan(l.exitLaneX - TILE / 2);
     }
   });
@@ -267,7 +272,9 @@ describe("tiles", () => {
       for (const t of l.tiles) {
         expect(Number.isInteger(t.col) && Number.isInteger(t.row)).toBe(true);
         expect([0, 1, 2, 3]).toContain(t.turn);
-        expect(["straight", "crossroad", "driveway", "sidewalk"]).toContain(t.kind);
+        expect(["driveway", "sidewalk"]).toContain(t.kind);
+        expect(t.col).toBeGreaterThanOrEqual(-1);
+        expect(t.col).toBeLessThanOrEqual(l.lotCols);
         const key = `${t.col},${t.row}`;
         expect(seen.get(key), `cell ${key} used twice (${seen.get(key)} and ${t.kind})`).toBe(
           undefined,
@@ -286,41 +293,23 @@ describe("tiles", () => {
     }
   });
 
-  it("the street runs east-west across the whole extent with driveway and crossroads", () => {
+  it("hold the agency block only: one driveway on the street row, no street tile", () => {
     for (const l of layouts) {
-      const at = (col: number, row: number) => l.tiles.find((t) => t.col === col && t.row === row);
-      for (let col = -2 - ROAD_EXTEND_TILES; col <= l.lotCols + 1 + ROAD_EXTEND_TILES; col++) {
-        const t = at(col, l.streetRow);
-        expect(t, `no street tile at column ${col}`).toBeDefined();
-        if (col === -2 || col === l.lotCols + 1) expect(t?.kind).toBe("crossroad");
-        else if (col === l.lotCols - 1) expect(t).toMatchObject({ kind: "driveway", turn: 0 });
-        else expect(t).toMatchObject({ kind: "straight", turn: 0 });
-      }
-      expect(at(-3 - ROAD_EXTEND_TILES, l.streetRow)).toBeUndefined();
+      const driveways = l.tiles.filter((t) => t.kind === "driveway");
+      expect(driveways).toEqual([
+        { kind: "driveway", col: l.lotCols - 1, row: l.streetRow, turn: 0 },
+      ]);
+      for (const t of l.tiles)
+        expect(t.row).toBeLessThan(l.streetRow + (t.kind === "driveway" ? 1 : 0));
     }
   });
 
-  it("the two cross streets run north-south and are never replaced by a sidewalk", () => {
-    for (const l of layouts) {
-      for (const col of [-2, l.lotCols + 1]) {
-        for (let row = -2; row <= l.streetRow + DECOR_RING_TILES; row++) {
-          const t = l.tiles.find((x) => x.col === col && x.row === row);
-          expect(t, `no tile at ${col},${row}`).toBeDefined();
-          if (row === l.streetRow) expect(t?.kind).toBe("crossroad");
-          else expect(t).toMatchObject({ kind: "straight", turn: 1 });
-        }
-      }
-    }
-  });
-
-  it("have sidewalks on columns -1 and lotCols and on the row south of the street", () => {
+  it("have sidewalks on columns -1 and lotCols beside the lot", () => {
     for (const l of layouts) {
       const kinds = (col: number, row: number) =>
         l.tiles.find((t) => t.col === col && t.row === row)?.kind;
       expect(kinds(-1, 1)).toBe("sidewalk");
       expect(kinds(l.lotCols, 1)).toBe("sidewalk");
-      expect(kinds(0, l.streetRow + 1)).toBe("sidewalk");
-      expect(kinds(l.lotCols - 1, l.streetRow + 1)).toBe("sidewalk");
     }
   });
 });
@@ -349,26 +338,24 @@ describe("props", () => {
     }
   });
 
-  it("neighbour buildings stand on columns -1 and lotCols of row 0", () => {
-    const xs = of("building").map((p) => Math.floor(p.x / TILE));
-    expect(xs).toContain(-1);
-    expect(xs).toContain(l.lotCols);
-    expect(of("backdrop").length).toBeGreaterThan(0);
-    for (const p of of("backdrop")) expect(p.z).toBeLessThan(0);
-  });
-
-  it("low buildings are south of the sidewalk only; no building stands on the lot or street", () => {
-    expect(of("lowBuilding").length).toBeGreaterThan(0);
-    for (const p of of("lowBuilding")) expect(p.z).toBeGreaterThanOrEqual((l.streetRow + 2) * TILE);
-    for (const p of [...of("building"), ...of("backdrop"), ...of("lowBuilding")]) {
-      const row = Math.floor(p.z / TILE);
-      expect(row === l.streetRow || row === l.streetRow + 1).toBe(false);
-      expect(inLot(l, p)).toBe(false);
+  it("only the agency block kinds remain; the neighbourhood moved to cityPlan", () => {
+    const allowed = ["agency", "awning", "sign", "parasol", "lamp"];
+    for (const n of [0, 12, 50]) {
+      for (const p of computeLayout(n, PORTRAIT).props) {
+        expect(allowed, `${p.kind} must come from cityPlan`).toContain(p.kind);
+        expect(p.scale).toBeGreaterThan(0);
+        expect(Number.isFinite(p.scale)).toBe(true);
+        expect(Number.isInteger(p.tint) && p.tint >= -1).toBe(true);
+      }
     }
   });
 
-  it("has lamps along the south sidewalk", () => {
+  it("has parking lamps and keeps parasols away from the agency", () => {
     expect(of("lamp").length).toBeGreaterThanOrEqual(2);
+    for (const p of of("parasol"))
+      expect(Math.abs(p.x - l.lot.width / 2)).toBeGreaterThanOrEqual(6);
+    for (const p of of("lamp"))
+      expect(inLot(l, p) || Math.floor(p.z / TILE) <= l.streetRow).toBe(true);
   });
 });
 
@@ -385,7 +372,7 @@ describe("exitPath / returnPath", () => {
     if (inLot(l, p)) return true;
     const { col, row } = cellOf(p);
     const t = l.tiles.find((x) => x.col === col && x.row === row);
-    return t !== undefined && ["straight", "crossroad", "driveway"].includes(t.kind);
+    return t !== undefined && t.kind === "driveway";
   };
 
   it.each(USABLES)("every point and segment stays on lot / driveway / street (%j)", (usable) => {
@@ -409,12 +396,12 @@ describe("exitPath / returnPath", () => {
     }
   });
 
-  it("the exit goes from the spot to exitEndX on the out lane through the exit lane", () => {
+  it("the exit goes from the spot to (exitLaneX, laneOutZ) through the exit lane", () => {
     const l = computeLayout(50, PORTRAIT);
     for (let i = 0; i < 50; i++) {
       const out = exitPath(l, i);
       expect(out[0]).toEqual(l.spots[i]);
-      expect(out[out.length - 1]).toEqual({ x: l.exitEndX, z: l.laneOutZ });
+      expect(out[out.length - 1]).toEqual({ x: l.exitLaneX, z: l.laneOutZ });
       const aisle = at(l.aisleZs, Math.floor(i / l.columns));
       expect(out).toContainEqual({ x: l.exitLaneX, z: aisle });
       expect(out).toContainEqual({ x: l.exitLaneX, z: l.laneOutZ });
@@ -425,11 +412,11 @@ describe("exitPath / returnPath", () => {
     }
   });
 
-  it("the return starts at exitEndX on the in lane and ends on the spot, entering from the aisle", () => {
+  it("the return starts at (exitLaneX, laneInZ) and ends on the spot, entering from the aisle", () => {
     const l = computeLayout(50, PORTRAIT);
     for (let i = 0; i < 50; i++) {
       const back = returnPath(l, i);
-      expect(back[0]).toEqual({ x: l.exitEndX, z: l.laneInZ });
+      expect(back[0]).toEqual({ x: l.exitLaneX, z: l.laneInZ });
       expect(back[back.length - 1]).toEqual(l.spots[i]);
       const aisle = at(l.aisleZs, Math.floor(i / l.columns));
       expect(back).toContainEqual({ x: l.exitLaneX, z: aisle });

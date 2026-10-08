@@ -1,4 +1,6 @@
+import type { Point3 } from "./iso";
 import type { PropKind, QuarterTurn, RoadTileKind } from "./layout";
+import type { TrafficModel } from "./traffic";
 
 /** Model -> Kenney asset mapping (spec 2.7). Pure: names and URLs only, nothing is loaded here. */
 
@@ -50,8 +52,10 @@ export const CAR_ASSET: Readonly<Record<CarAssetKey, AssetRef>> = Object.freeze(
 export const ROAD_TILE_ASSET: Readonly<Record<RoadTileKind, AssetRef>> = Object.freeze({
   straight: ref("roads", "road-straight"),
   crossroad: ref("roads", "road-crossroad"),
+  crossing: ref("roads", "road-crossing"),
   driveway: ref("roads", "road-driveway-single"),
   sidewalk: ref("roads", "tile-low"),
+  asphalt: ref("roads", "road-square"),
 });
 
 /** The variant of a placement is taken modulo the list length. "sign" is a plain mesh (no asset). */
@@ -60,20 +64,59 @@ export const PROP_ASSETS: Readonly<Record<PropKind, readonly AssetRef[]>> = Obje
   awning: refs("city", ["detail-awning-wide"]),
   sign: refs("city", []),
   parasol: refs("city", ["detail-parasol-a", "detail-parasol-b"]),
+  // building-h is reserved for the agency.
   building: refs(
     "city",
-    letters("a", "f").map((l) => `building-${l}`),
+    [...letters("a", "g"), ...letters("i", "n")].map((l) => `building-${l}`),
   ),
   backdrop: refs(
     "city",
     letters("a", "e").map((l) => `building-skyscraper-${l}`),
   ),
-  lowBuilding: refs(
-    "city",
-    letters("a", "n").map((l) => `low-detail-building-${l}`),
-  ),
+  lowBuilding: refs("city", [
+    ...letters("a", "n").map((l) => `low-detail-building-${l}`),
+    "low-detail-building-wide-a",
+    "low-detail-building-wide-b",
+  ]),
   lamp: refs("roads", ["light-square"]),
+  streetLamp: refs("roads", ["light-curved"]),
+  trafficLight: refs("roads", ["traffic-light"]),
+  // road-sign-street has the pole; road-sign-object-street is the bare plate.
+  streetSign: refs("roads", ["road-sign-street"]),
+  construction: refs("roads", [
+    "construction-fence",
+    "construction-barrier",
+    "construction-cone",
+    "construction-light",
+  ]),
+  dumpster: refs("roads", ["dumpster"]),
+  tree: refs("roads", []),
+  parkedCar: refs("cars", []),
 });
+
+/** Background-traffic model -> asset (`cars/{name}`). */
+export const TRAFFIC_ASSET: Readonly<Record<TrafficModel, AssetRef>> = Object.freeze({
+  taxi: ref("cars", "taxi"),
+  suv: ref("cars", "suv"),
+  van: ref("cars", "van"),
+  delivery: ref("cars", "delivery"),
+  truck: ref("cars", "truck"),
+  police: ref("cars", "police"),
+  ambulance: ref("cars", "ambulance"),
+  "garbage-truck": ref("cars", "garbage-truck"),
+});
+
+/**
+ * Lamp head in model space (unscaled), measured from the glb bounds: the pole is at the origin and
+ * the arm reaches towards -z (light-curved: y 0.675, z -0.2; light-square: y 0.6, z -0.2125).
+ */
+export const LAMP_HEAD: Readonly<Record<string, Point3>> = Object.freeze({
+  "light-square": Object.freeze({ x: 0, y: 0.59, z: -0.2 }),
+  "light-curved": Object.freeze({ x: 0, y: 0.66, z: -0.18 }),
+});
+
+/** The "low-detail" models are tall silhouettes; this keeps the south side below the street view. */
+export const LOW_BUILDING_SCALE = 4.2;
 
 /** Uniform scale per kit (the kits do not share an original scale). */
 export const KIT_SCALE: Readonly<Record<Kit, number>> = Object.freeze({
@@ -86,7 +129,11 @@ export const KIT_SCALE: Readonly<Record<Kit, number>> = Object.freeze({
 export const AGENCY_SCALE = 7;
 
 /** Quarter-turn correction per asset name, tuned against screenshots (0 when absent). */
-export const ASSET_TURN_OFFSET: Readonly<Record<string, QuarterTurn>> = Object.freeze({});
+export const ASSET_TURN_OFFSET: Readonly<Record<string, QuarterTurn>> = Object.freeze({
+  // The lamp arm points to -z; heading 0 means "front towards +z", so turn half a circle.
+  "light-square": 2,
+  "light-curved": 2,
+});
 
 /** `${base}/` normalised + `assets/{kit}/{name}.glb`. A missing or non-string base becomes "/". */
 export function assetUrl(asset: AssetRef, baseUrl: string): string {
@@ -106,6 +153,7 @@ export function requiredAssets(): readonly AssetRef[] {
     out.push(a);
   };
   Object.values(CAR_ASSET).forEach(add);
+  Object.values(TRAFFIC_ASSET).forEach(add);
   Object.values(ROAD_TILE_ASSET).forEach(add);
   Object.values(PROP_ASSETS).forEach((list) => {
     list.forEach(add);
