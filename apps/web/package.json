@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@rt/sim": "^0.0.0",
+    "@rt/sim": "*",
     "pixi.js": "^8.22.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

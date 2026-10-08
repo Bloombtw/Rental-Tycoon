@@ -22,6 +22,15 @@ describe("protect-files hook", () => {
     ".env",
     ".env.local",
     "package-lock.json",
+    "package.json",
+    "packages/sim/package.json",
+    "apps/server/package.json",
+    "apps/web/package.json",
+    abs("apps/web/package.json"),
+    "vitest.config.ts",
+    "packages/sim/vitest.config.ts",
+    "apps/server/vitest.config.ts",
+    "tests/harness/vitest.config.ts",
     ".claude/settings.json",
     ".claude/hooks/lib.mjs",
     ".claude/agents/sim-engineer.md",
@@ -39,12 +48,15 @@ describe("protect-files hook", () => {
     expect(run("protect-files.mjs", file)).toBe(BLOCKED);
   });
 
-  it.each(["packages/sim/src/a.ts", abs("apps/web/src/App.tsx"), "docs/specs/x.md", "README.md"])(
-    "allows %s",
-    (file) => {
-      expect(run("protect-files.mjs", file)).toBe(0);
-    },
-  );
+  it.each([
+    "packages/sim/src/a.ts",
+    abs("apps/web/src/App.tsx"),
+    "docs/specs/x.md",
+    "README.md",
+    "packages/sim/src/package.ts",
+  ])("allows %s", (file) => {
+    expect(run("protect-files.mjs", file)).toBe(0);
+  });
 });
 
 describe("guard-scope hook", () => {

@@ -9,7 +9,7 @@ npm install
 npm run dev        # serveur :3001 + jeu sur http://localhost:5173
 ```
 
-Node 22.5+ requis.
+Node 24.15+ requis (`nvm use` lit `.nvmrc`).
 
 ## Vérifier
 

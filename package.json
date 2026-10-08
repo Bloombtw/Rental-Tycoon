@@ -7,7 +7,7 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @rt/server & npm run dev -w @rt/web",
+    "dev": "node scripts/dev.mjs",
     "dev:web": "npm run dev -w @rt/web",
     "dev:server": "npm run dev -w @rt/server",
     "build": "npm run build --workspaces --if-present",
@@ -22,7 +22,7 @@
     "prepare": "husky"
   },
   "engines": {
-    "node": ">=22.5"
+    "node": ">=24.15"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

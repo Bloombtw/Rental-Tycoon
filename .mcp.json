@@ -2,11 +2,11 @@
   "mcpServers": {
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--output-dir", "screenshots"]
+      "args": ["-y", "@playwright/mcp@0.0.82", "--output-dir", "screenshots"]
     },
     "context7": {
       "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp@latest"]
+      "args": ["-y", "@upstash/context7-mcp@4.1.1"]
     }
   }
 }

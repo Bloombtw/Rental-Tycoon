@@ -33,8 +33,10 @@ export default tseslint.config(
     rules: reactHooks.configs.recommended.rules,
   },
   {
-    files: [".claude/hooks/**/*.{js,mjs}", "*.config.{js,ts}"],
-    languageOptions: { globals: { process: "readonly", console: "readonly" } },
+    files: [".claude/hooks/**/*.{js,mjs}", "scripts/**/*.{js,mjs}", "*.config.{js,ts}"],
+    languageOptions: {
+      globals: { process: "readonly", console: "readonly", setTimeout: "readonly" },
+    },
     rules: { "no-console": "off" },
   },
   prettier,
