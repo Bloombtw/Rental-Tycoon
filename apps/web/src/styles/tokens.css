@@ -9,8 +9,23 @@
   --c-money: #3fa34d;
   --c-danger: #d62839;
   --c-ink: #1b1b1e;
+  /* Contrast-safe variants (WCAG AA, 4.5:1 for normal text) */
+  --c-danger-on-dark: #ff8a94; /* 5.98:1 on --c-asphalt */
+  --c-money-on-dark: #6fd07a; /* 7.05:1 on --c-asphalt */
+  --c-money-strong: #26692f; /* 6.68:1 with --c-on-dark text */
+  --c-danger-text: #b31d2c; /* 5.9:1 on --c-sand, higher on --c-surface */
+  --c-surface: #ffffff;
+  --c-on-dark: #ffffff;
+  --c-ink-muted: #5c5f73;
   --radius: 14px;
+  --radius-sm: 8px;
   --shadow: 0 6px 0 rgb(0 0 0 / 0.15);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --transition: 160ms ease-out;
   --font: "Inter", system-ui, sans-serif;
   font-family: var(--font);
   color: var(--c-ink);
@@ -18,7 +33,4 @@
 }
 body {
   margin: 0;
-}
-.app {
-  padding: 24px;
 }

@@ -1,4 +1,9 @@
-import { MAX_CAR_DAILY_COST, MAX_CAR_DAILY_PRICE, MAX_FLEET_SIZE } from "./economy.js";
+import {
+  MAX_CAR_DAILY_COST,
+  MAX_CAR_DAILY_PRICE,
+  MAX_FLEET_SIZE,
+  type CarModelId,
+} from "./economy.js";
 import { InvalidFleetError, InvalidSeedError, InvalidStartingCashError } from "./errors.js";
 
 /** Money is always an integer number of cents. Never use floats for money. */
@@ -9,6 +14,8 @@ export type CarId = number;
 
 export interface Car {
   readonly id: CarId;
+  /** Present for bought cars; absent for createGame fixtures. */
+  readonly model?: CarModelId;
   readonly dailyPrice: Cents;
   readonly dailyCost: Cents;
   /** Rented during the last simulated day. */
@@ -27,6 +34,13 @@ export interface GameState {
   readonly day: number;
   readonly cash: Cents;
   readonly fleet: readonly Car[];
+  /** Report of the last simulated day; null before any day is simulated. */
+  readonly lastDay: DayReport | null;
+}
+
+export interface DayReport {
+  readonly revenue: Cents;
+  readonly costs: Cents;
 }
 
 function isCentsInRange(value: unknown, max: number): value is number {
@@ -74,5 +88,6 @@ export function createGame(
     day: 0,
     cash: startingCash,
     fleet: cars,
+    lastDay: null,
   };
 }
