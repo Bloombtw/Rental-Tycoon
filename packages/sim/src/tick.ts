@@ -11,7 +11,17 @@ export function tick(state: GameState): GameState {
     const rented = car.dailyPrice <= MAX_ACCEPTED_DAILY_PRICE;
     if (rented) revenue += car.dailyPrice;
     costs += car.dailyCost;
-    fleet.push({ id: car.id, dailyPrice: car.dailyPrice, dailyCost: car.dailyCost, rented });
+    fleet.push(
+      "model" in car && car.model !== undefined
+        ? {
+            id: car.id,
+            model: car.model,
+            dailyPrice: car.dailyPrice,
+            dailyCost: car.dailyCost,
+            rented,
+          }
+        : { id: car.id, dailyPrice: car.dailyPrice, dailyCost: car.dailyCost, rented },
+    );
   }
   const net = revenue - costs;
   const cash = state.cash + net;
@@ -25,7 +35,14 @@ export function tick(state: GameState): GameState {
   ) {
     throw new SimOverflowError("cash");
   }
-  return { seed: state.seed, rngState: state.rngState, day, cash, fleet };
+  return {
+    seed: state.seed,
+    rngState: state.rngState,
+    day,
+    cash,
+    fleet,
+    lastDay: { revenue, costs },
+  };
 }
 
 /** Applies `tick` `days` times. `days` is validated before any simulation. */

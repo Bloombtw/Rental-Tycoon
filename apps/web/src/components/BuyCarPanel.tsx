@@ -1,0 +1,48 @@
+import { CAR_MODELS, CAR_MODEL_IDS, MAX_FLEET_SIZE, type CarModelId, type Cents } from "@rt/sim";
+import { formatCents } from "../format.js";
+import { CAR_MODEL_LABELS } from "../game/messages.js";
+
+interface BuyCarPanelProps {
+  readonly cash: Cents;
+  readonly fleetSize: number;
+  readonly highlight: boolean;
+  readonly onBuy: (model: CarModelId) => void;
+}
+
+export function BuyCarPanel({ cash, fleetSize, highlight, onBuy }: BuyCarPanelProps) {
+  const full = fleetSize >= MAX_FLEET_SIZE;
+  return (
+    <section className="card panel" data-highlight={String(highlight)} aria-labelledby="buy-title">
+      <h2 id="buy-title">Acheter une voiture</h2>
+      {CAR_MODEL_IDS.map((id) => {
+        const model = CAR_MODELS[id];
+        const poor = !(cash >= model.purchasePrice);
+        const reason = full
+          ? `Flotte complète (${MAX_FLEET_SIZE}/${MAX_FLEET_SIZE})`
+          : poor
+            ? "Fonds insuffisants"
+            : null;
+        return (
+          <div className="buy-card" key={id}>
+            <h3>{CAR_MODEL_LABELS[id]}</h3>
+            <p>Prix d'achat {formatCents(model.purchasePrice)}</p>
+            <p>Coût {formatCents(model.dailyCost)}/jour</p>
+            <p className="buy-hint">Prix conseillé {formatCents(model.defaultDailyPrice)}/jour</p>
+            <button
+              type="button"
+              className="btn"
+              data-testid={`buy-${id}`}
+              disabled={reason !== null}
+              onClick={() => {
+                onBuy(id);
+              }}
+            >
+              Acheter
+            </button>
+            {reason !== null && <p className="buy-hint">{reason}</p>}
+          </div>
+        );
+      })}
+    </section>
+  );
+}

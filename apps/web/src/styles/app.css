@@ -1,0 +1,243 @@
+/* Page layout (spec first-playable §5.1). Tokens only, no raw colour values. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.app h1,
+.app h2,
+.app h3,
+.app p {
+  margin: 0;
+}
+
+.card {
+  background: var(--c-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-4);
+}
+
+/* HUD */
+.hud {
+  background: var(--c-asphalt);
+  color: var(--c-on-dark);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hud-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-5);
+}
+
+.hud-main > .spacer {
+  margin-left: auto;
+}
+
+.hud-cash {
+  color: var(--c-money);
+  font-weight: 700;
+  transition: color var(--transition);
+}
+
+.hud-cash[data-negative="true"] {
+  color: var(--c-danger);
+}
+
+.hud-report {
+  color: var(--c-accent-2);
+  font-size: 0.9rem;
+}
+
+.hud-report[data-sign="negative"] {
+  color: var(--c-danger);
+}
+
+/* Buttons */
+.btn {
+  font: inherit;
+  font-weight: 700;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  background: var(--c-accent);
+  color: var(--c-on-dark);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition:
+    transform var(--transition),
+    box-shadow var(--transition);
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: none;
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--c-accent-2);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  background: var(--c-road);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Message banner */
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  color: var(--c-on-dark);
+  box-shadow: var(--shadow);
+}
+
+.banner[data-kind="notice"] {
+  background: var(--c-money);
+}
+
+.banner[data-kind="error"] {
+  background: var(--c-danger);
+}
+
+/* Two-column main area */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.panel[data-highlight="true"] {
+  outline: 3px solid var(--c-accent);
+}
+
+.empty-state {
+  color: var(--c-ink-muted);
+}
+
+/* Fleet */
+.car-row {
+  background: var(--c-sand);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.car-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  font-size: 0.9rem;
+}
+
+.badge {
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+  color: var(--c-on-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.badge[data-status="rented"] {
+  background: var(--c-money);
+}
+
+.badge[data-status="parked"] {
+  background: var(--c-road);
+}
+
+/* Price editor and inputs */
+.price-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.input {
+  font: inherit;
+  width: 8em;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--c-road);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  color: var(--c-ink);
+}
+
+.input:focus-visible {
+  outline: 3px solid var(--c-accent-2);
+  outline-offset: 1px;
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--c-danger);
+}
+
+.field-error {
+  color: var(--c-danger);
+  font-size: 0.85rem;
+  flex-basis: 100%;
+}
+
+/* Buy panel */
+.buy-card {
+  background: var(--c-sand);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.buy-hint {
+  color: var(--c-ink-muted);
+  font-size: 0.85rem;
+}
+
+/* Error boundary fallback */
+.error-fallback {
+  text-align: center;
+  color: var(--c-danger);
+}
