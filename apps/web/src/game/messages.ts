@@ -20,6 +20,24 @@ export const PRICE_FORMAT_ERROR = "Format invalide : saisissez un montant en eur
 
 export const PRICE_RANGE_ERROR = `Le prix doit être compris entre ${formatCents(0)} et ${formatCents(MAX_CAR_DAILY_PRICE)} par jour.`;
 
+export const SAVE_CORRUPT_ERROR = "Sauvegarde illisible : une nouvelle partie a commencé.";
+export const SAVE_NEWER_ERROR =
+  "Cette sauvegarde vient d'une version plus récente du jeu : une nouvelle partie a commencé. Mettez l'application à jour pour la retrouver.";
+export const SAVE_UNAVAILABLE_WARNING =
+  "Sauvegarde indisponible sur cet appareil : la partie sera perdue en fermant l'application.";
+export const SAVE_FAILED_WARNING =
+  "Sauvegarde impossible (stockage plein ?) : la partie continue mais ne sera pas conservée.";
+export const NEW_GAME_NOTICE = "Nouvelle partie commencée.";
+
+export function resumeNotice(clock: string): string {
+  return `Partie reprise : ${clock}. Touchez Reprendre pour continuer.`;
+}
+
+export function newGameSummary(clock: string, cash: string, cars: number): string {
+  const n = Number.isSafeInteger(cars) && cars >= 0 ? cars : 0;
+  return `Ta partie actuelle (${clock}, ${cash}, ${n} voiture${n > 1 ? "s" : ""}) sera définitivement effacée.`;
+}
+
 const GENERIC_ERROR = "Une erreur inattendue est survenue : action annulée.";
 
 /** Maps any thrown value to a French message. Never throws. */

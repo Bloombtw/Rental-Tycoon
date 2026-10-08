@@ -40,3 +40,17 @@ Les questions qui demandent une décision humaine. Le travail ne bloque pas dess
 
 8. **Flotte de 50 voitures non mesurée.** La caisse de départ ne permet d'acheter qu'une douzaine de voitures : draw calls et fps à 50 voitures restent à relever.
    _Recommandation_ : relever lors du test iPhone (question 4), une fois la sauvegarde disponible pour préparer une partie avancée.
+
+## autosave (révision 1, sauvegarde automatique)
+
+1. **Reprise directe ou écran titre « Continuer / Nouvelle partie » ?** La spec reprend directement la partie, en pause, avec le message « Partie reprise ».
+   _Recommandation_ : reprise directe (norme des tycoons mobiles, aucun tap inutile). Un écran titre pourra venir avec le tutoriel (Phase 3, point 11).
+
+2. **Plusieurs onglets ouverts en même temps (ordinateur).** Chaque onglet écrase la sauvegarde de l'autre : la dernière écriture gagne.
+   _Recommandation_ : l'accepter (cas rare, jeu joué surtout sur iPhone en PWA). À revoir si un joueur perd une partie de cette façon.
+
+3. **Exporter / importer une sauvegarde** (copier un texte, changer d'appareil, récupérer l'emplacement de secours `rental-tycoon/save-rejected`). Hors périmètre.
+   _Recommandation_ : pas maintenant ; la sauvegarde sur le serveur optionnel ou un export texte pourra être une feature à part.
+
+4. **Vérification sur un vrai iPhone** (critère 16) : PWA installée, appli tuée depuis le sélecteur, puis rouverte. Les agents n'ont pas d'iPhone.
+   _Recommandation_ : fusionner après les tests jsdom et l'émulation, puis faire vérifier par un humain.

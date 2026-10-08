@@ -11,7 +11,7 @@ import {
 } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { dayBannerText, isSpeed, type Speed } from "./clock.js";
-import { CAR_MODEL_LABELS, errorMessage } from "./messages.js";
+import { CAR_MODEL_LABELS, NEW_GAME_NOTICE, errorMessage } from "./messages.js";
 
 export const DEFAULT_SEED = 1;
 
@@ -37,7 +37,12 @@ export type GameAction =
   | { type: "togglePause" }
   | { type: "pause" }
   | { type: "dismissMessage" }
-  | { type: "dismissDayBanner" };
+  | { type: "dismissDayBanner" }
+  | { type: "newGame"; seed: number };
+
+function isSeed(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 2 ** 32;
+}
 
 export function initUiState(game?: GameState): UiState {
   return {
@@ -104,6 +109,11 @@ export function gameReducer(state: UiState, action: GameAction): UiState {
 function reduce(state: UiState, action: GameAction): UiState {
   const type: unknown = (action as { type?: unknown } | null | undefined)?.type;
   switch (type) {
+    case "newGame": {
+      const seed: unknown = (action as { seed?: unknown }).seed;
+      if (!isSeed(seed)) return state;
+      return { ...initUiState(createGame(seed)), notice: NEW_GAME_NOTICE };
+    }
     case "dismissMessage":
       return { ...state, error: null, notice: null };
     case "dismissDayBanner":
