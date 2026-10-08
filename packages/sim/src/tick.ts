@@ -1,48 +1,15 @@
-import { MAX_ACCEPTED_DAILY_PRICE, MAX_ADVANCE_DAYS } from "./economy.js";
+import { MAX_ADVANCE_DAYS } from "./economy.js";
 import { InvalidDaysError, SimOverflowError } from "./errors.js";
-import type { Car, GameState } from "./state.js";
+import type { GameState } from "./state.js";
+import { advanceMinutes, DAY_MINUTES } from "./time.js";
 
-/** Advances the simulation by one day. Pure: same input, same output. */
+/** Advances the simulation to the next opening. Pure: same input, same output. */
 export function tick(state: GameState): GameState {
-  const fleet: Car[] = [];
-  let revenue = 0;
-  let costs = 0;
-  for (const car of state.fleet) {
-    const rented = car.dailyPrice <= MAX_ACCEPTED_DAILY_PRICE;
-    if (rented) revenue += car.dailyPrice;
-    costs += car.dailyCost;
-    fleet.push(
-      "model" in car && car.model !== undefined
-        ? {
-            id: car.id,
-            model: car.model,
-            dailyPrice: car.dailyPrice,
-            dailyCost: car.dailyCost,
-            rented,
-          }
-        : { id: car.id, dailyPrice: car.dailyPrice, dailyCost: car.dailyCost, rented },
-    );
+  const m = state.minute;
+  if (typeof m !== "number" || !Number.isSafeInteger(m) || m < 0 || m >= DAY_MINUTES) {
+    throw new SimOverflowError("minute");
   }
-  const net = revenue - costs;
-  const cash = state.cash + net;
-  const day = state.day + 1;
-  if (!Number.isSafeInteger(cash)) throw new SimOverflowError("cash");
-  if (!Number.isSafeInteger(day)) throw new SimOverflowError("day");
-  if (
-    !Number.isSafeInteger(revenue) ||
-    !Number.isSafeInteger(costs) ||
-    !Number.isSafeInteger(net)
-  ) {
-    throw new SimOverflowError("cash");
-  }
-  return {
-    seed: state.seed,
-    rngState: state.rngState,
-    day,
-    cash,
-    fleet,
-    lastDay: { revenue, costs },
-  };
+  return advanceMinutes(state, DAY_MINUTES - m);
 }
 
 /** Applies `tick` `days` times. `days` is validated before any simulation. */

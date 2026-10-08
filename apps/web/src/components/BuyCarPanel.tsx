@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { memo, useId } from "react";
 import { CAR_MODELS, CAR_MODEL_IDS, MAX_FLEET_SIZE, type CarModelId, type Cents } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { CAR_MODEL_LABELS } from "../game/messages.js";
@@ -10,7 +10,12 @@ interface BuyCarPanelProps {
   readonly onBuy: (model: CarModelId) => void;
 }
 
-export function BuyCarPanel({ cash, fleetSize, highlight, onBuy }: BuyCarPanelProps) {
+export const BuyCarPanel = memo(function BuyCarPanel({
+  cash,
+  fleetSize,
+  highlight,
+  onBuy,
+}: BuyCarPanelProps) {
   const baseId = useId();
   const full = fleetSize >= MAX_FLEET_SIZE;
   return (
@@ -52,4 +57,4 @@ export function BuyCarPanel({ cash, fleetSize, highlight, onBuy }: BuyCarPanelPr
       })}
     </section>
   );
-}
+});

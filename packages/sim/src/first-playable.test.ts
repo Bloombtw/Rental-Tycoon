@@ -82,8 +82,29 @@ function stateOf(
   cash: Cents = C,
   extra: Partial<GameState> = {},
 ): GameState {
-  return { seed: 1, rngState: 1, day: 0, cash, fleet, lastDay: null, ...extra };
+  return {
+    seed: 1,
+    rngState: 1,
+    day: 0,
+    minute: 0,
+    cash,
+    todayRevenue: 0,
+    fleet,
+    lastDay: null,
+    ...extra,
+  };
 }
+
+const STATE_KEYS = [
+  "cash",
+  "day",
+  "fleet",
+  "lastDay",
+  "minute",
+  "rngState",
+  "seed",
+  "todayRevenue",
+];
 
 function carsWithIds(ids: readonly number[]): Car[] {
   return ids.map((id) => ({ id, dailyPrice: 60_00, dailyCost: 25_00, rented: false }));
@@ -175,7 +196,7 @@ describe("lastDay", () => {
   it("createGame has lastDay null and exact state keys", () => {
     const g = createGame(1);
     expect(g.lastDay).toBeNull();
-    expect(Object.keys(g).sort()).toEqual(["cash", "day", "fleet", "lastDay", "rngState", "seed"]);
+    expect(Object.keys(g).sort()).toEqual(STATE_KEYS);
   });
 
   it("tick fills lastDay: MIXED, IDLE, empty", () => {
@@ -186,7 +207,7 @@ describe("lastDay", () => {
 
   it("tick state keys stay exact and lastDay has exactly revenue and costs", () => {
     const t = tick(createGame(1, C, MIXED));
-    expect(Object.keys(t).sort()).toEqual(["cash", "day", "fleet", "lastDay", "rngState", "seed"]);
+    expect(Object.keys(t).sort()).toEqual(STATE_KEYS);
     expect(Object.keys(t.lastDay ?? {}).sort()).toEqual(["costs", "revenue"]);
   });
 
@@ -286,7 +307,7 @@ describe("buyCar", () => {
     expect(b.seed).toBe(g.seed);
     expect(b.rngState).toBe(g.rngState);
     expect(b.lastDay).toBe(g.lastDay);
-    expect(Object.keys(b).sort()).toEqual(["cash", "day", "fleet", "lastDay", "rngState", "seed"]);
+    expect(Object.keys(b).sort()).toEqual(STATE_KEYS);
   });
 
   it.each(MODEL_IDS)("%s: bought car carries catalogue values", (id) => {
@@ -582,7 +603,7 @@ describe("setCarPrice", () => {
     expect(s.lastDay).toBe(g.lastDay);
     expect(s.seed).toBe(g.seed);
     expect(s.rngState).toBe(g.rngState);
-    expect(Object.keys(s).sort()).toEqual(["cash", "day", "fleet", "lastDay", "rngState", "seed"]);
+    expect(Object.keys(s).sort()).toEqual(STATE_KEYS);
   });
 
   it("same price still returns a new state and new fleet array", () => {

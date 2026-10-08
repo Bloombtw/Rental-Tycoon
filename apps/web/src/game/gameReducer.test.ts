@@ -31,6 +31,9 @@ const MIXED: readonly NewCar[] = [
 ];
 
 const forge = (a: unknown): GameAction => a as GameAction;
+const DAY: GameAction = { type: "advanceTime", minutes: 720 };
+/** A state with the clock running at x1 (time only advances when not paused). */
+const running = (game?: GameState): UiState => ({ ...initUiState(game), paused: false });
 const dirty = (s: string | null): boolean =>
   s !== null && /NaN|undefined|Infinity|\[object/.test(s);
 
@@ -43,9 +46,17 @@ function deepFreeze<T>(value: T): T {
 }
 
 describe("initUiState", () => {
-  it("defaults to createGame(DEFAULT_SEED) with no messages", () => {
+  it("defaults to createGame(DEFAULT_SEED), paused at x1, no messages", () => {
     expect(DEFAULT_SEED).toBe(1);
-    expect(initUiState()).toEqual({ game: createGame(DEFAULT_SEED), error: null, notice: null });
+    expect(initUiState()).toEqual({
+      game: createGame(DEFAULT_SEED),
+      error: null,
+      notice: null,
+      speed: 1,
+      paused: true,
+      hasRun: false,
+      dayBanner: null,
+    });
   });
 
   it("uses a provided game by reference", () => {
@@ -95,7 +106,7 @@ describe("gameReducer", () => {
   it("a success replaces a previous error", () => {
     let s = gameReducer(initUiState(), { type: "setCarPrice", carId: 99, dailyPrice: 1 });
     expect(s.error).not.toBeNull();
-    s = gameReducer(s, { type: "nextDay" });
+    s = gameReducer(s, { type: "buyCar", model: "used" });
     expect(s.error).toBeNull();
     expect(s.notice).not.toBeNull();
   });
@@ -150,31 +161,37 @@ describe("gameReducer", () => {
     expect(s.notice).toBe(`Prix de la voiture n°1 fixé à ${formatCents(0)}/jour.`);
   });
 
-  it("nextDay: day+1, lastDay filled, notice 'Jour 1 terminé'", () => {
-    const s = gameReducer(initUiState(createGame(1, 50_000_00, MIXED)), { type: "nextDay" });
+  it("advanceTime 720: day+1, lastDay filled, dayBanner with the net result, no notice", () => {
+    const s = gameReducer(running(createGame(1, 50_000_00, MIXED)), DAY);
     expect(s.game.day).toBe(1);
+    expect(s.game.minute).toBe(0);
     expect(s.game.lastDay).toEqual({ revenue: 100_00, costs: 80_00 });
-    expect(s.notice).toBe(`Jour 1 terminé : résultat ${formatCents(100_00 - 80_00)}.`);
+    expect(s.dayBanner).toBe(`Jour 2 : l'agence ouvre ! Hier : +${formatCents(100_00 - 80_00)}`);
+    expect(s.notice).toBeNull();
     expect(s.error).toBeNull();
   });
 
-  it("nextDay with a negative result shows it formatted", () => {
-    const s = gameReducer(initUiState(createGame(1, 0, IDLE)), { type: "nextDay" });
-    expect(s.notice).toBe(`Jour 1 terminé : résultat ${formatCents(-50_00)}.`);
+  it("advanceTime with a negative result shows it formatted, without a plus sign", () => {
+    const s = gameReducer(running(createGame(1, 0, IDLE)), DAY);
+    expect(s.dayBanner).toBe(`Jour 2 : l'agence ouvre ! Hier : ${formatCents(-50_00)}`);
+    expect(s.dayBanner).not.toContain("+");
   });
 
-  it("nextDay at the overflow edge: SIM_OVERFLOW message, same game", () => {
+  it("advanceTime at the overflow edge: SIM_OVERFLOW message, same game, paused", () => {
     const g = createGame(1, Number.MAX_SAFE_INTEGER, [{ dailyPrice: 100_00, dailyCost: 1_00 }]);
-    const start = initUiState(g);
-    const s = gameReducer(start, { type: "nextDay" });
+    const start = running(g);
+    const s = gameReducer(start, DAY);
     expect(s.game).toBe(g);
+    expect(s.paused).toBe(true);
     expect(s.error).toBe("La simulation a atteint une limite numérique : action annulée.");
     expect(s.notice).toBeNull();
+    // a second commit while paused must not stack another error or change anything
+    expect(gameReducer(s, DAY)).toBe(s);
   });
 
   it("dismissMessage clears both", () => {
     const s = gameReducer(
-      { game: createGame(1), error: "e", notice: "n" },
+      { ...initUiState(), error: "e", notice: "n" },
       { type: "dismissMessage" },
     );
     expect(s.error).toBeNull();
@@ -182,7 +199,7 @@ describe("gameReducer", () => {
   });
 
   it("dismissMessage keeps the game by reference", () => {
-    const start = gameReducer(initUiState(), { type: "nextDay" });
+    const start = gameReducer(running(createGame(1, 0, IDLE)), DAY);
     expect(gameReducer(start, { type: "dismissMessage" }).game).toBe(start.game);
   });
 
@@ -200,8 +217,9 @@ describe("gameReducer", () => {
       null,
       undefined,
       42,
-      "nextDay",
+      "advanceTime",
       [],
+      { type: "nextDay" },
     ]) {
       expect(gameReducer(start, forge(a))).toBe(start);
     }
@@ -239,12 +257,17 @@ describe("gameReducer", () => {
     const start = deepFreeze(initUiState());
     const actions: GameAction[] = [
       { type: "buyCar", model: "hybrid" },
-      { type: "nextDay" },
+      { type: "advanceTime", minutes: 10 },
       { type: "setCarPrice", carId: 1, dailyPrice: 1 },
       { type: "dismissMessage" },
+      { type: "setSpeed", speed: 4 },
+      { type: "togglePause" },
+      { type: "pause" },
+      { type: "dismissDayBanner" },
     ];
     for (const a of actions) {
       expect(gameReducer(start, a)).toEqual(gameReducer(start, a));
+      expect(gameReducer(deepFreeze(running()), a)).toEqual(gameReducer(running(), a));
     }
   });
 
@@ -269,19 +292,203 @@ describe("gameReducer", () => {
     expect(s.error).toBe(errorMessage(new FleetFullError(MAX_FLEET_SIZE)));
   });
 
-  it("spam nextDay x1000: exactly 1000 days, no junk", () => {
-    let s: UiState = initUiState(createGame(1, 0, IDLE));
-    for (let i = 0; i < 1000; i++) s = gameReducer(s, { type: "nextDay" });
+  it("spam advanceTime 720 x1000: exactly 1000 days, no junk", () => {
+    let s: UiState = running(createGame(1, 0, IDLE));
+    for (let i = 0; i < 1000; i++) s = gameReducer(s, DAY);
     expect(s.game.day).toBe(1000);
     expect(s.game.cash).toBe(-1000 * 50_00);
     expect(dirty(s.notice)).toBe(false);
+    expect(dirty(s.dayBanner)).toBe(false);
+    expect(s.dayBanner).toBe(`Jour 1001 : l'agence ouvre ! Hier : ${formatCents(-50_00)}`);
   });
 
-  it("bought then ticked state goes through the reducer consistently with the sim", () => {
-    let s: UiState = initUiState();
+  it("bought then advanced state goes through the reducer consistently with the sim", () => {
+    let s: UiState = running();
     s = gameReducer(s, { type: "buyCar", model: "compact" as CarModelId });
-    s = gameReducer(s, { type: "nextDay" });
+    s = gameReducer(s, DAY);
     const expected: GameState = tick(buyCar(createGame(1), "compact"));
     expect(s.game).toEqual(expected);
+  });
+});
+
+describe("advanceTime", () => {
+  it("while paused returns the very same state, whatever the minutes", () => {
+    const start = initUiState();
+    for (const minutes of [0, 10, 720, -1, NaN, "x", undefined]) {
+      expect(gameReducer(start, forge({ type: "advanceTime", minutes }))).toBe(start);
+    }
+  });
+
+  it("0 minutes returns the same state", () => {
+    const start = running();
+    expect(gameReducer(start, { type: "advanceTime", minutes: 0 })).toBe(start);
+    expect(gameReducer(start, { type: "advanceTime", minutes: -0 })).toBe(start);
+  });
+
+  it("advances the clock without touching error or notice or the banner", () => {
+    const start: UiState = {
+      ...running(createGame(1, 50_000_00, MIXED)),
+      error: "e",
+      notice: "n",
+      dayBanner: "b",
+    };
+    const s = gameReducer(start, { type: "advanceTime", minutes: 30 });
+    expect(s.game.minute).toBe(30);
+    expect(s.error).toBe("e");
+    expect(s.notice).toBe("n");
+    expect(s.dayBanner).toBe("b");
+    expect(s.paused).toBe(false);
+  });
+
+  it("live cash: the first departure pays at once", () => {
+    const s = gameReducer(running(createGame(1, 1000, MIXED)), { type: "advanceTime", minutes: 1 });
+    expect(s.game.cash).toBe(1000 + 100_00);
+    expect(s.game.todayRevenue).toBe(100_00);
+  });
+
+  it("a day closing replaces the previous banner; a mid-day commit keeps it", () => {
+    const g = createGame(1, 0, IDLE);
+    let s = gameReducer(running(g), DAY);
+    const first = s.dayBanner;
+    expect(first).not.toBeNull();
+    s = gameReducer(s, { type: "advanceTime", minutes: 5 });
+    expect(s.dayBanner).toBe(first);
+    s = gameReducer(s, { type: "advanceTime", minutes: 715 });
+    expect(s.dayBanner).toBe(`Jour 3 : l'agence ouvre ! Hier : ${formatCents(-50_00)}`);
+  });
+
+  it.each([-1, 0.5, NaN, Infinity, 721, 1e9, "5", null, undefined, {}, [], 10n, true])(
+    "hostile minutes %s: game unchanged, paused, a French error, no exception",
+    (minutes) => {
+      const start = running(createGame(1, 5000, MIXED));
+      const s = gameReducer(start, forge({ type: "advanceTime", minutes }));
+      if (s === start) throw new Error("hostile minutes must not be silently accepted");
+      expect(s.game).toBe(start.game);
+      expect(s.paused).toBe(true);
+      expect(s.error).toBe("Une erreur inattendue est survenue : action annulée.");
+      expect(s.notice).toBeNull();
+    },
+  );
+
+  it("an advanceTime action with a throwing minutes getter does not throw", () => {
+    const bad = {
+      type: "advanceTime",
+      get minutes(): number {
+        throw new Error("x");
+      },
+    };
+    expect(() => gameReducer(running(), forge(bad))).not.toThrow();
+  });
+
+  it("a corrupt game minute pauses with the overflow message", () => {
+    const g: GameState = { ...createGame(1, 0, IDLE), minute: 5000 };
+    const s = gameReducer(running(g), { type: "advanceTime", minutes: 1 });
+    expect(s.paused).toBe(true);
+    expect(s.error).toBe("La simulation a atteint une limite numérique : action annulée.");
+    expect(s.game).toBe(g);
+  });
+
+  it("a refused advance clears a pending notice", () => {
+    const s = gameReducer(
+      { ...running(), notice: "n" },
+      forge({ type: "advanceTime", minutes: -3 }),
+    );
+    expect(s.notice).toBeNull();
+  });
+
+  it("buying while paused is allowed and does not resume", () => {
+    const s = gameReducer(initUiState(), { type: "buyCar", model: "used" });
+    expect(s.paused).toBe(true);
+    expect(s.game.fleet).toHaveLength(1);
+    expect(s.hasRun).toBe(false);
+  });
+});
+
+describe("setSpeed / togglePause / pause / hasRun / dismissDayBanner", () => {
+  it.each([1, 2, 4, 10] as const)(
+    "setSpeed %s resumes, remembers the speed, sets hasRun",
+    (speed) => {
+      const s = gameReducer(initUiState(), { type: "setSpeed", speed });
+      expect(s).toMatchObject({ speed, paused: false, hasRun: true });
+    },
+  );
+
+  it.each([0, 3, 5, 100, -1, 1.5, NaN, Infinity, "1", "x1", null, undefined, {}, [1], true])(
+    "setSpeed %s is ignored: exact same state",
+    (speed) => {
+      const start = initUiState();
+      expect(gameReducer(start, forge({ type: "setSpeed", speed }))).toBe(start);
+      const r = running();
+      expect(gameReducer(r, forge({ type: "setSpeed", speed }))).toBe(r);
+    },
+  );
+
+  it("setSpeed on the active speed while paused resumes (tap on the active speed)", () => {
+    const s = gameReducer(initUiState(), { type: "setSpeed", speed: 1 });
+    expect(s.paused).toBe(false);
+  });
+
+  it("setSpeed while running changes only the speed", () => {
+    const start = running();
+    const s = gameReducer(start, { type: "setSpeed", speed: 10 });
+    expect(s.speed).toBe(10);
+    expect(s.paused).toBe(false);
+    expect(s.game).toBe(start.game);
+  });
+
+  it("togglePause: resume sets hasRun, pause keeps the speed and hasRun", () => {
+    let s = gameReducer(initUiState(), { type: "setSpeed", speed: 4 });
+    s = gameReducer(s, { type: "togglePause" });
+    expect(s).toMatchObject({ paused: true, speed: 4, hasRun: true });
+    s = gameReducer(s, { type: "togglePause" });
+    expect(s).toMatchObject({ paused: false, speed: 4, hasRun: true });
+  });
+
+  it("togglePause from the initial state resumes at x1 and sets hasRun", () => {
+    expect(gameReducer(initUiState(), { type: "togglePause" })).toMatchObject({
+      paused: false,
+      speed: 1,
+      hasRun: true,
+    });
+  });
+
+  it("togglePause x1001 from paused ends running; the game never changes", () => {
+    let s = initUiState();
+    for (let i = 0; i < 1001; i++) s = gameReducer(s, { type: "togglePause" });
+    expect(s.paused).toBe(false);
+    expect(s.game).toEqual(createGame(DEFAULT_SEED));
+  });
+
+  it("pause is idempotent: already paused returns the same reference", () => {
+    const start = initUiState();
+    expect(gameReducer(start, { type: "pause" })).toBe(start);
+    const r = running();
+    const p = gameReducer(r, { type: "pause" });
+    expect(p.paused).toBe(true);
+    expect(p.speed).toBe(r.speed);
+    expect(p.hasRun).toBe(r.hasRun);
+    expect(gameReducer(p, { type: "pause" })).toBe(p);
+  });
+
+  it("pause never sets hasRun", () => {
+    expect(gameReducer(initUiState(), { type: "pause" }).hasRun).toBe(false);
+  });
+
+  it("dismissDayBanner clears only the banner; no banner returns the same state", () => {
+    const start = initUiState();
+    expect(gameReducer(start, { type: "dismissDayBanner" })).toBe(start);
+    const withBanner: UiState = { ...running(), dayBanner: "x", error: "e", notice: "n" };
+    const s = gameReducer(withBanner, { type: "dismissDayBanner" });
+    expect(s).toEqual({ ...withBanner, dayBanner: null });
+  });
+
+  it("dismissMessage does not clear the day banner", () => {
+    const s = gameReducer({ ...running(), dayBanner: "x" }, { type: "dismissMessage" });
+    expect(s.dayBanner).toBe("x");
+  });
+
+  it("a forged nextDay action is ignored", () => {
+    const start = running();
+    expect(gameReducer(start, forge({ type: "nextDay" }))).toBe(start);
   });
 });

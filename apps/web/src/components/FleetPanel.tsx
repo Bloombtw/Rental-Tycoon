@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { Car, CarId, Cents } from "@rt/sim";
 import { CarRow } from "./CarRow.js";
 
@@ -6,7 +7,7 @@ interface FleetPanelProps {
   readonly onSetPrice: (carId: CarId, dailyPrice: Cents) => void;
 }
 
-export function FleetPanel({ fleet, onSetPrice }: FleetPanelProps) {
+export const FleetPanel = memo(function FleetPanel({ fleet, onSetPrice }: FleetPanelProps) {
   return (
     <section className="card panel" aria-labelledby="fleet-title">
       <h2 id="fleet-title">Ma flotte</h2>
@@ -29,4 +30,4 @@ export function FleetPanel({ fleet, onSetPrice }: FleetPanelProps) {
       )}
     </section>
   );
-}
+});

@@ -2,6 +2,7 @@ import type { Cents } from "./state.js";
 
 export type SimErrorCode =
   | "INVALID_DAYS"
+  | "INVALID_MINUTES"
   | "SIM_OVERFLOW"
   | "INVALID_FLEET"
   | "INVALID_SEED"
@@ -33,11 +34,22 @@ export class InvalidDaysError extends SimError {
   }
 }
 
+export class InvalidMinutesError extends SimError {
+  readonly code = "INVALID_MINUTES" as const;
+  readonly minutes: unknown;
+
+  constructor(minutes: unknown) {
+    super("minutes must be a safe integer between 0 and MAX_ADVANCE_MINUTES");
+    this.name = "InvalidMinutesError";
+    this.minutes = minutes;
+  }
+}
+
 export class SimOverflowError extends SimError {
   readonly code = "SIM_OVERFLOW" as const;
-  readonly field: "cash" | "day" | "carId";
+  readonly field: "cash" | "day" | "carId" | "minute";
 
-  constructor(field: "cash" | "day" | "carId") {
+  constructor(field: "cash" | "day" | "carId" | "minute") {
     super(`${field} left the safe integer range`);
     this.name = "SimOverflowError";
     this.field = field;

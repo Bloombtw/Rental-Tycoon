@@ -2,6 +2,8 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface ErrorBoundaryProps {
   readonly children?: ReactNode;
+  /** Local replacement shown instead of the full-page error. */
+  readonly fallback?: ReactNode;
 }
 
 interface ErrorBoundaryState {
@@ -22,6 +24,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override render(): ReactNode {
     if (this.state.failed) {
+      if (this.props.fallback !== undefined) return this.props.fallback;
       return (
         <main className="app error-fallback" role="alert" data-testid="error-fallback">
           <h1>Oups</h1>

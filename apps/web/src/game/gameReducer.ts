@@ -1,15 +1,16 @@
 import {
   CAR_MODELS,
+  advanceMinutes,
   buyCar,
   createGame,
   setCarPrice,
-  tick,
   type CarId,
   type CarModelId,
   type Cents,
   type GameState,
 } from "@rt/sim";
 import { formatCents } from "../format.js";
+import { dayBannerText, isSpeed, type Speed } from "./clock.js";
 import { CAR_MODEL_LABELS, errorMessage } from "./messages.js";
 
 export const DEFAULT_SEED = 1;
@@ -20,16 +21,34 @@ export interface UiState {
   readonly error: string | null;
   /** French message of the last successful action. */
   readonly notice: string | null;
+  readonly speed: Speed;
+  readonly paused: boolean;
+  /** Has time ever run (used to highlight the "Reprendre" button). */
+  readonly hasRun: boolean;
+  /** "New day" toast text. */
+  readonly dayBanner: string | null;
 }
 
 export type GameAction =
   | { type: "buyCar"; model: CarModelId }
   | { type: "setCarPrice"; carId: CarId; dailyPrice: Cents }
-  | { type: "nextDay" }
-  | { type: "dismissMessage" };
+  | { type: "advanceTime"; minutes: number }
+  | { type: "setSpeed"; speed: Speed }
+  | { type: "togglePause" }
+  | { type: "pause" }
+  | { type: "dismissMessage" }
+  | { type: "dismissDayBanner" };
 
 export function initUiState(game?: GameState): UiState {
-  return { game: game ?? createGame(DEFAULT_SEED), error: null, notice: null };
+  return {
+    game: game ?? createGame(DEFAULT_SEED),
+    error: null,
+    notice: null,
+    speed: 1,
+    paused: true,
+    hasRun: false,
+    dayBanner: null,
+  };
 }
 
 function applyAction(game: GameState, action: GameAction): { game: GameState; notice: string } {
@@ -52,29 +71,63 @@ function applyAction(game: GameState, action: GameAction): { game: GameState; no
         notice: `Prix de la voiture n°${action.carId} fixé à ${formatCents(applied?.dailyPrice ?? 0)}/jour.`,
       };
     }
-    case "nextDay": {
-      const next = tick(game);
-      const net = next.lastDay ? next.lastDay.revenue - next.lastDay.costs : 0;
-      return {
-        game: next,
-        notice: `Jour ${next.day} terminé : résultat ${formatCents(net)}.`,
-      };
-    }
     default:
       throw new Error("unknown action");
   }
 }
 
+function advanceTime(state: UiState, minutes: unknown): UiState {
+  if (state.paused) return state;
+  try {
+    const next = advanceMinutes(state.game, minutes as number);
+    if (next === state.game) return state;
+    const closed = next.day > state.game.day;
+    return {
+      ...state,
+      game: next,
+      dayBanner: closed ? dayBannerText(next.day, next.lastDay) : state.dayBanner,
+    };
+  } catch (err) {
+    return { ...state, paused: true, error: errorMessage(err), notice: null };
+  }
+}
+
+/** Never throws: any failure while reading a forged action leaves the state untouched. */
 export function gameReducer(state: UiState, action: GameAction): UiState {
   try {
-    const type: unknown = (action as { type?: unknown } | null | undefined)?.type;
-    if (type === "dismissMessage") {
-      return { game: state.game, error: null, notice: null };
+    return reduce(state, action);
+  } catch {
+    return state;
+  }
+}
+
+function reduce(state: UiState, action: GameAction): UiState {
+  const type: unknown = (action as { type?: unknown } | null | undefined)?.type;
+  switch (type) {
+    case "dismissMessage":
+      return { ...state, error: null, notice: null };
+    case "dismissDayBanner":
+      return state.dayBanner === null ? state : { ...state, dayBanner: null };
+    case "advanceTime":
+      return advanceTime(state, (action as { minutes?: unknown }).minutes);
+    case "setSpeed": {
+      const speed: unknown = (action as { speed?: unknown }).speed;
+      if (!isSpeed(speed)) return state;
+      return { ...state, speed, paused: false, hasRun: true };
     }
-    if (type !== "buyCar" && type !== "setCarPrice" && type !== "nextDay") return state;
-    const result = applyAction(state.game, action);
-    return { game: result.game, error: null, notice: result.notice };
-  } catch (err) {
-    return { game: state.game, error: errorMessage(err), notice: null };
+    case "togglePause":
+      return state.paused ? { ...state, paused: false, hasRun: true } : { ...state, paused: true };
+    case "pause":
+      return state.paused ? state : { ...state, paused: true };
+    case "buyCar":
+    case "setCarPrice":
+      try {
+        const result = applyAction(state.game, action);
+        return { ...state, game: result.game, error: null, notice: result.notice };
+      } catch (err) {
+        return { ...state, error: errorMessage(err), notice: null };
+      }
+    default:
+      return state;
   }
 }

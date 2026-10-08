@@ -18,7 +18,7 @@ export interface Car {
   readonly model?: CarModelId;
   readonly dailyPrice: Cents;
   readonly dailyCost: Cents;
-  /** Rented during the last simulated day. */
+  /** Rented at its last departure slot. */
   readonly rented: boolean;
 }
 
@@ -32,9 +32,13 @@ export interface GameState {
   readonly rngState: number;
   /** Simulation day, starting at 0. */
   readonly day: number;
+  /** Minutes elapsed since opening (09:00), 0..719. */
+  readonly minute: number;
   readonly cash: Cents;
+  /** Revenue collected since opening (already in cash). */
+  readonly todayRevenue: Cents;
   readonly fleet: readonly Car[];
-  /** Report of the last simulated day; null before any day is simulated. */
+  /** Report of the last closed day; null before the first closing. */
   readonly lastDay: DayReport | null;
 }
 
@@ -86,7 +90,9 @@ export function createGame(
     seed: normalizedSeed,
     rngState: normalizedSeed >>> 0,
     day: 0,
+    minute: 0,
     cash: startingCash,
+    todayRevenue: 0,
     fleet: cars,
     lastDay: null,
   };

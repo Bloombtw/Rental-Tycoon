@@ -14,6 +14,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { formatCents } from "./format.js";
 import { PRICE_FORMAT_ERROR, PRICE_RANGE_ERROR } from "./game/messages.js";
 import { formatCentsForInput } from "./game/parseEuros.js";
+import type { ClockDriver } from "./game/useGameClock.js";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -26,7 +27,59 @@ const FIXTURE: readonly NewCar[] = [{ dailyPrice: 60_00, dailyCost: 25_00 }];
 let container: HTMLElement;
 let root: Root;
 
+/** Manual animation-frame clock: nothing moves unless a test calls `frames`. */
+interface ManualDriver extends ClockDriver {
+  /** Runs `n` animation frames of `stepMs` real milliseconds each. */
+  frames(n: number, stepMs?: number): void;
+  scheduled(): number;
+}
+function makeDriver(): ManualDriver {
+  let now = 0;
+  let nextId = 1;
+  const queue = new Map<number, () => void>();
+  return {
+    now: () => now,
+    requestFrame: (cb) => {
+      const id = nextId++;
+      queue.set(id, cb);
+      return id;
+    },
+    cancelFrame: (id) => {
+      queue.delete(id);
+    },
+    scheduled: () => queue.size,
+    frames(n, stepMs = 100) {
+      for (let i = 0; i < n; i++) {
+        now += stepMs;
+        const due = Array.from(queue.entries());
+        queue.clear();
+        act(() => {
+          for (const [, cb] of due) cb();
+        });
+      }
+    },
+  };
+}
+let driver: ManualDriver;
+
+/** Runs frames until the HUD clock text satisfies `until` (bounded). */
+function runUntil(until: (clock: string) => boolean, stepMs = 100, maxFrames = 20_000): void {
+  for (let i = 0; i < maxFrames; i++) {
+    if (until(text("hud-clock"))) return;
+    driver.frames(1, stepMs);
+  }
+  throw new Error(`clock never reached the target, stuck at ${text("hud-clock")}`);
+}
+/** Starts time at x1 (or the given speed) and runs until the next opening (day number N). */
+function playUntilDay(dayNumber: number, speedId = "speed-1", stepMs = 100): void {
+  clickId(speedId);
+  runUntil((c) => c.startsWith(`Jour ${dayNumber} `), stepMs);
+}
+
 beforeEach(() => {
+  // jsdom has no canvas: silence its "not implemented" noise; WebGL stays unavailable.
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+  driver = makeDriver();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -47,7 +100,13 @@ function mount(node: ReactNode): void {
 }
 
 function mountApp(initialGame?: GameState): void {
-  mount(initialGame ? <App initialGame={initialGame} /> : <App />);
+  mount(
+    initialGame ? (
+      <App initialGame={initialGame} clockDriver={driver} />
+    ) : (
+      <App clockDriver={driver} />
+    ),
+  );
 }
 
 function byId(id: string): HTMLElement {
@@ -111,18 +170,32 @@ function assertClean(): void {
   }
   expect(container.innerHTML).not.toBe("");
 }
+/** The "Hier : ..." report line, without the trailing "Aujourd'hui" part. */
+function reportText(): string {
+  const today = maybeId("hud-today")?.textContent ?? "";
+  return norm(text("hud-report").replace(today, ""));
+}
 function cashText(): string {
   return norm(text("hud-cash"));
 }
 
 describe("App: launch", () => {
-  it("shows day 1, 50 000,00 EUR, no report, welcome message", () => {
+  it("shows Jour 1 · 09:00, paused with Reprendre highlighted, 50 000,00 EUR, no report", () => {
     mountApp();
-    expect(text("hud-day")).toBe("Jour 1");
+    expect(text("hud-clock")).toBe("Jour 1 · 09:00");
+    expect(maybeId("hud-day")).toBeNull();
+    expect(maybeId("next-day")).toBeNull();
+    expect(text("speed-pause")).toBe("Reprendre");
+    expect(byId("speed-pause").getAttribute("aria-pressed")).toBe("true");
+    expect(byId("speed-pause").getAttribute("data-highlight")).toBe("true");
+    expect(byId("speed-1").getAttribute("aria-pressed")).toBe("true");
+    expect(byId("drawer-toggle").getAttribute("aria-expanded")).toBe("true");
+    expect(maybeId("agency-fallback")).not.toBeNull();
     expect(cashText()).toBe(norm(formatCents(50_000_00)));
     expect(cashText()).toBe("50 000,00 €");
     expect(byId("hud-cash").getAttribute("data-negative")).toBe("false");
-    expect(text("hud-report")).toBe("Aucune journée écoulée.");
+    expect(reportText()).toBe("Aucune journée écoulée.");
+    expect(norm(text("hud-today"))).toContain("Aujourd'hui : +0,00 €");
     expect(maybeId("fleet-empty")).not.toBeNull();
     expect(container.textContent).toContain(`Flotte 0/${MAX_FLEET_SIZE}`);
     expect(maybeId("error-banner")).toBeNull();
@@ -167,20 +240,60 @@ describe("App: purchase and day flow", () => {
     assertClean();
   });
 
-  it("then next day: Jour 2, Louée, report", () => {
+  it("then a full day at x1: Jour 2, Louée, report, toast", () => {
     mountApp();
     clickId("buy-compact");
-    clickId("next-day");
-    expect(text("hud-day")).toBe("Jour 2");
+    playUntilDay(2);
+    expect(text("hud-clock").startsWith("Jour 2 · 09:0")).toBe(true);
+    expect(norm(text("day-banner"))).toBe("Jour 2 : l'agence ouvre ! Hier : +35,00 €");
+    expect(byId("day-banner").getAttribute("role")).toBe("status");
     expect(byId("car-row-1").textContent).toContain("Louée");
-    expect(norm(text("hud-report"))).toBe(
+    expect(reportText()).toBe(
       norm(
         `Hier : recettes ${formatCents(60_00)} · charges ${formatCents(25_00)} · résultat +${formatCents(35_00)}`,
       ),
     );
     expect(byId("hud-report").getAttribute("data-sign")).toBe("positive");
-    expect(norm(text("notice"))).toContain("Jour 1 terminé");
+    expect(norm(text("notice"))).not.toContain("terminé");
     assertClean();
+  });
+
+  it("cash rises live at the departure, costs are only taken at closing", () => {
+    mountApp();
+    clickId("buy-compact");
+    const afterBuy = 50_000_00 - CAR_MODELS.compact.purchasePrice;
+    clickId("speed-1");
+    runUntil((c) => c !== "Jour 1 · 09:00", 100);
+    expect(cashText()).toBe(norm(formatCents(afterBuy + 60_00)));
+    expect(norm(text("hud-today"))).toContain(`Aujourd'hui : +${norm(formatCents(60_00))}`);
+    runUntil((c) => c === "Jour 1 · 20:59" || c.startsWith("Jour 2"), 100);
+    runUntil((c) => c.startsWith("Jour 2"), 100);
+    expect(cashText()).toBe(norm(formatCents(afterBuy + 60_00 - 25_00)));
+  });
+
+  it("time only moves while running: x1 for 1 s is 25 minutes, x10 is 250, pause freezes", () => {
+    mountApp();
+    driver.frames(20);
+    expect(text("hud-clock")).toBe("Jour 1 · 09:00");
+    clickId("speed-1");
+    driver.frames(10);
+    expect(text("hud-clock")).toBe("Jour 1 · 09:25");
+    clickId("speed-pause");
+    expect(text("speed-pause")).toBe("Reprendre");
+    driver.frames(50);
+    expect(text("hud-clock")).toBe("Jour 1 · 09:25");
+    clickId("speed-10");
+    expect(text("speed-pause")).toBe("Pause");
+    driver.frames(10);
+    expect(text("hud-clock")).toBe("Jour 1 · 13:35");
+  });
+
+  it("a 10 s hung frame advances at most 250 ms worth", () => {
+    mountApp();
+    clickId("speed-1");
+    driver.frames(1, 10_000);
+    driver.frames(1, 100);
+    expect(text("hud-clock")).toBe("Jour 1 · 09:08");
   });
 
   it("set price 150 shows 150,00 EUR and a notice", () => {
@@ -205,7 +318,7 @@ describe("App: purchase and day flow", () => {
     mountApp();
     clickId("buy-compact");
     setPrice(1, "150,01");
-    clickId("next-day");
+    playUntilDay(2);
     expect(byId("car-row-1").textContent).toContain("Au parking");
     expect(byId("hud-report").getAttribute("data-sign")).toBe("negative");
     expect(norm(text("hud-report"))).toContain(
@@ -215,9 +328,9 @@ describe("App: purchase and day flow", () => {
 
   it("zero result is shown without + sign and data-sign zero", () => {
     mountApp(createGame(1, 100, [{ dailyPrice: 25_00, dailyCost: 25_00 }]));
-    clickId("next-day");
+    playUntilDay(2);
     expect(byId("hud-report").getAttribute("data-sign")).toBe("zero");
-    expect(text("hud-report")).not.toContain("+");
+    expect(reportText()).not.toContain("+");
     assertClean();
   });
 
@@ -402,10 +515,10 @@ describe("App: buying limits", () => {
   });
 });
 
-describe("App: next day", () => {
+describe("App: days go by", () => {
   it("IDLE fleet: cash goes negative, data-negative, negative report", () => {
     mountApp(createGame(1, 0, IDLE));
-    clickId("next-day");
+    playUntilDay(2);
     expect(byId("hud-cash").getAttribute("data-negative")).toBe("true");
     expect(cashText()).toBe(norm(formatCents(-50_00)));
     expect(byId("hud-report").getAttribute("data-sign")).toBe("negative");
@@ -418,22 +531,56 @@ describe("App: next day", () => {
     expect(byId("hud-cash").getAttribute("data-negative")).toBe("false");
   });
 
-  it("50 rapid clicks advance exactly 50 days", () => {
-    mountApp();
-    for (let i = 0; i < 50; i++) clickId("next-day");
-    expect(text("hud-day")).toBe("Jour 51");
+  it("30 days at x10 with 50 cars: Jour 31, one toast at a time, still clean", () => {
+    const fleet = Array.from({ length: MAX_FLEET_SIZE }, () => ({
+      dailyPrice: 100_00,
+      dailyCost: 1_00,
+    }));
+    mountApp(createGame(1, 0, fleet));
+    clickId("speed-10");
+    let maxToasts = 0;
+    runUntil((c) => {
+      maxToasts = Math.max(
+        maxToasts,
+        container.querySelectorAll('[data-testid="day-banner"]').length,
+      );
+      return c.startsWith("Jour 31 ");
+    }, 100);
+    expect(maxToasts).toBe(1);
+    expect(container.querySelectorAll('[data-testid="day-banner"]')).toHaveLength(1);
+    expect(
+      container.querySelector('[data-testid="agency-view"]')?.getAttribute("data-car-sprites"),
+    ).toBe(String(MAX_FLEET_SIZE));
     assertClean();
   });
 
-  it("overflow edge: error banner, game displayed unchanged", () => {
+  it("a long hung frame at x10 never skips a closing: the report is still consistent", () => {
+    mountApp(createGame(1, 0, IDLE));
+    clickId("speed-10");
+    for (let i = 0; i < 40; i++) driver.frames(1, 5_000);
+    const m = /^Jour (\d+) · /.exec(text("hud-clock"));
+    expect(m).not.toBeNull();
+    const day = Number(m?.[1]) - 1;
+    expect(cashText()).toBe(norm(formatCents(-50_00 * day)));
+    assertClean();
+  });
+
+  it("overflow edge: one error banner, game unchanged, time paused", () => {
     mountApp(createGame(1, Number.MAX_SAFE_INTEGER, [{ dailyPrice: 100_00, dailyCost: 1_00 }]));
     const cashBefore = cashText();
-    clickId("next-day");
-    const banner = byId("error-banner");
-    expect(banner.getAttribute("role")).toBe("alert");
-    expect(banner.textContent).toContain("limite numérique");
-    expect(text("hud-day")).toBe("Jour 1");
+    clickId("speed-10");
+    driver.frames(30);
+    const banners = container.querySelectorAll('[data-testid="error-banner"]');
+    expect(banners).toHaveLength(1);
+    expect(banners[0]?.getAttribute("role")).toBe("alert");
+    expect(banners[0]?.textContent).toContain("limite numérique");
+    expect(text("hud-clock")).toBe("Jour 1 · 09:00");
     expect(cashText()).toBe(cashBefore);
+    expect(text("speed-pause")).toBe("Reprendre");
+    expect(byId("speed-pause").getAttribute("aria-pressed")).toBe("true");
+    // BUG (useGameClock): the commit that triggers the pause runs inside the frame callback, so
+    // the cleanup finds no frame to cancel and the loop then reschedules itself.
+    expect(driver.scheduled()).toBe(0);
     assertClean();
   });
 
@@ -441,6 +588,250 @@ describe("App: next day", () => {
     mountApp(createGame(1, Number.MAX_SAFE_INTEGER));
     assertClean();
     expect(text("hud-cash")).not.toMatch(/e\+/i);
+  });
+});
+
+describe("App: speed controls", () => {
+  it("a group with a label; every button is a pressed-toggle", () => {
+    mountApp();
+    const group = container.querySelector('[role="group"]');
+    expect(group?.getAttribute("aria-label")).toBe("Vitesse du temps");
+    for (const id of ["speed-pause", "speed-1", "speed-2", "speed-4", "speed-10"]) {
+      expect(["true", "false"]).toContain(byId(id).getAttribute("aria-pressed"));
+    }
+  });
+
+  it("choosing a speed resumes, marks it pressed, un-marks the others, drops the highlight", () => {
+    mountApp();
+    clickId("speed-4");
+    expect(byId("speed-4").getAttribute("aria-pressed")).toBe("true");
+    for (const id of ["speed-1", "speed-2", "speed-10"]) {
+      expect(byId(id).getAttribute("aria-pressed")).toBe("false");
+    }
+    expect(text("speed-pause")).toBe("Pause");
+    expect(byId("speed-pause").getAttribute("aria-pressed")).toBe("false");
+    expect(byId("speed-pause").getAttribute("data-highlight")).toBe("false");
+  });
+
+  it("pause keeps the chosen speed pressed; tapping the active speed resumes", () => {
+    mountApp();
+    clickId("speed-2");
+    clickId("speed-pause");
+    expect(byId("speed-2").getAttribute("aria-pressed")).toBe("true");
+    expect(text("speed-pause")).toBe("Reprendre");
+    expect(byId("speed-pause").getAttribute("data-highlight")).toBe("false"); // time has run
+    clickId("speed-2");
+    expect(text("speed-pause")).toBe("Pause");
+  });
+
+  it("hammering the buttons never breaks the clock or the page", () => {
+    mountApp();
+    for (let i = 0; i < 200; i++) {
+      clickId(["speed-1", "speed-2", "speed-4", "speed-10", "speed-pause"][i % 5] as string);
+      if (i % 7 === 0) driver.frames(1);
+    }
+    assertClean();
+    expect(text("hud-clock")).toMatch(/^Jour \d+ · \d\d:\d\d$/);
+  });
+
+  it("every speed button is at least a button element with an accessible name", () => {
+    mountApp();
+    for (const id of ["speed-pause", "speed-1", "speed-2", "speed-4", "speed-10"]) {
+      const b = byId(id);
+      expect(b.tagName).toBe("BUTTON");
+      expect((b.textContent ?? "").length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("App: hidden page and unmount", () => {
+  function setVisibility(state: "hidden" | "visible"): void {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+  }
+  afterEach(() => {
+    Reflect.deleteProperty(document, "visibilityState");
+  });
+
+  it("hiding the page pauses, and the game stays paused when the page comes back", () => {
+    mountApp();
+    clickId("speed-1");
+    driver.frames(5);
+    const before = text("hud-clock");
+    setVisibility("hidden");
+    expect(text("speed-pause")).toBe("Reprendre");
+    setVisibility("visible");
+    expect(text("speed-pause")).toBe("Reprendre");
+    driver.frames(20);
+    expect(text("hud-clock")).toBe(before);
+  });
+
+  it("pagehide pauses too, and hiding while already paused changes nothing", () => {
+    mountApp();
+    setVisibility("hidden");
+    expect(text("speed-pause")).toBe("Reprendre");
+    expect(byId("speed-pause").getAttribute("data-highlight")).toBe("true");
+    clickId("speed-1");
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    expect(text("speed-pause")).toBe("Reprendre");
+  });
+
+  it("unmounting (also under StrictMode) leaves no scheduled frame and no canvas", () => {
+    act(() => {
+      root.unmount();
+    });
+    root = createRoot(container);
+    mount(
+      <StrictMode>
+        <App clockDriver={driver} />
+      </StrictMode>,
+    );
+    clickId("speed-10");
+    driver.frames(3);
+    expect(driver.scheduled()).toBe(1);
+    act(() => {
+      root.unmount();
+    });
+    expect(driver.scheduled()).toBe(0);
+    expect(container.querySelector("canvas")).toBeNull();
+    root = createRoot(container);
+  });
+
+  it("pausing cancels the pending frame", () => {
+    mountApp();
+    clickId("speed-1");
+    driver.frames(2);
+    expect(driver.scheduled()).toBe(1);
+    clickId("speed-pause");
+    expect(driver.scheduled()).toBe(0);
+  });
+
+  it("switching speed does not leave two loops running", () => {
+    mountApp();
+    for (const id of ["speed-1", "speed-2", "speed-4", "speed-10", "speed-1"]) clickId(id);
+    expect(driver.scheduled()).toBe(1);
+  });
+});
+
+describe("App: drawer and view", () => {
+  it("opens at launch; the handle collapses and expands it and hides the content", () => {
+    mountApp();
+    const toggle = byId("drawer-toggle");
+    const content = container.querySelector<HTMLElement>("#drawer-content");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(content?.hidden).toBe(false);
+    click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(content?.hidden).toBe(true);
+    expect(byId("drawer").getAttribute("data-state")).toBe("peek");
+    expect(toggle.textContent).toContain(`Flotte 0/${MAX_FLEET_SIZE}`);
+    click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("the fleet counter in the handle follows purchases while collapsed", () => {
+    mountApp();
+    clickId("buy-used");
+    click(byId("drawer-toggle"));
+    expect(byId("drawer-toggle").textContent).toContain(`Flotte 1/${MAX_FLEET_SIZE}`);
+  });
+
+  function pointer(el: HTMLElement, type: string, clientY: number): void {
+    const ev = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(ev, { clientY, pointerId: 1, pointerType: "touch" });
+    act(() => {
+      el.dispatchEvent(ev);
+    });
+  }
+
+  it("dragging the handle down by more than 40 px collapses; 30 px does nothing", () => {
+    mountApp();
+    const toggle = byId("drawer-toggle");
+    pointer(toggle, "pointerdown", 100);
+    pointer(toggle, "pointerup", 130);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    pointer(toggle, "pointerdown", 100);
+    pointer(toggle, "pointerup", 150);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    pointer(toggle, "pointerdown", 150);
+    pointer(toggle, "pointerup", 90);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("without WebGL (jsdom) the fallback replaces the view, time keeps running, panels still work", () => {
+    mountApp();
+    const view = byId("agency-view");
+    expect(view.getAttribute("data-state")).toBe("fallback");
+    expect(text("agency-fallback")).toBe(
+      "Vue de l'agence indisponible sur cet appareil. Utilisez le panneau « Gérer l'agence ».",
+    );
+    expect(container.querySelector("canvas")).toBeNull();
+    expect(maybeId("camera-reset")).toBeNull();
+    clickId("buy-used");
+    clickId("speed-10");
+    driver.frames(5);
+    expect(text("hud-clock")).not.toBe("Jour 1 · 09:00");
+    expect(view.getAttribute("data-car-sprites")).toBe("1");
+    assertClean();
+  });
+
+  it("data-car-sprites depends only on the fleet size, never on time", () => {
+    mountApp(createGame(1, 0, IDLE));
+    clickId("speed-10");
+    for (let i = 0; i < 50; i++) {
+      driver.frames(1);
+      expect(byId("agency-view").getAttribute("data-car-sprites")).toBe("2");
+    }
+  });
+});
+
+describe("App: new-day toast", () => {
+  it("disappears by itself", () => {
+    vi.useFakeTimers();
+    try {
+      mountApp(createGame(1, 0, IDLE));
+      playUntilDay(2, "speed-10");
+      expect(maybeId("day-banner")).not.toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(maybeId("day-banner")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("closes with a tap", () => {
+    mountApp(createGame(1, 0, IDLE));
+    playUntilDay(2, "speed-10");
+    click(byId("day-banner"));
+    expect(maybeId("day-banner")).toBeNull();
+  });
+
+  it("a new closing replaces the text, and does not touch the error banner or notice", () => {
+    mountApp(createGame(1, 10_000_00, IDLE));
+    clickId("buy-used"); // sets a notice
+    const notice = text("notice");
+    playUntilDay(2, "speed-10");
+    const first = text("day-banner");
+    expect(text("notice")).toBe(notice);
+    runUntil((c) => c.startsWith("Jour 3 "), 100);
+    expect(container.querySelectorAll('[data-testid="day-banner"]')).toHaveLength(1);
+    expect(text("day-banner")).not.toBe(first);
+    expect(text("day-banner")).toContain("Jour 3 : l'agence ouvre !");
+    expect(text("notice")).toBe(notice);
+  });
+
+  it("is not shown at launch, nor after a mid-day commit", () => {
+    mountApp();
+    expect(maybeId("day-banner")).toBeNull();
+    clickId("speed-1");
+    driver.frames(10);
+    expect(maybeId("day-banner")).toBeNull();
   });
 });
 

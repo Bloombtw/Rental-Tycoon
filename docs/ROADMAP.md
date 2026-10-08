@@ -45,7 +45,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 - ✅ Boucle de base : flotte, locations journalières, charges fixes (`core-loop.md`)
 - ✅ Première partie jouable : achat, prix, HUD (`first-playable.md`)
 - ✅ PWA installable sur iPhone, déployée sur GitHub Pages
-- 🚧 Journées 09:00–21:00, temps continu avec vitesses, vue de l'agence (`agency-view.md`) — **à terminer en priorité, avec le changement de moteur** :
+- ✅ Journées 09:00–21:00, temps continu avec vitesses, vue de l'agence en 3D Three.js (`agency-view.md`) — fait avec le changement de moteur :
   1. Garder et terminer la partie **sim** (`time.ts`, journée d'ouverture, encaissement en direct) et la partie **horloge / vitesses / HUD** côté web : elles ne dépendent pas du moteur de rendu.
   2. Réviser la spec (`agency-view.md`, nouvelle révision) : la vue PixiJS 2D est remplacée par la **scène 3D Three.js** décrite ci-dessus ; les comportements de la spec (pastilles, sélection, gestes, caméra, bannière nouveau jour, démarrage en pause) restent valables.
   3. Remplacer `apps/web/src/scene/` (PixiJS) par la scène Three.js. Pas de double moteur à la fin de la feature.
@@ -85,6 +85,14 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 
 - Travailler **en autonomie** : enchaîner les points dans l'ordre sans demander de validation entre deux features.
 - Les décisions de design ambiguës : prendre l'option la plus raisonnable pour un tycoon mobile, la noter dans la section « Historique des décisions » de la spec, et lister les vraies questions dans `docs/QUESTIONS.md` au lieu de bloquer.
-- Après chaque feature : `npm run check` vert, captures d'écran à jour, commit, cocher le point ici (⬜ → ✅).
+- Après chaque feature : `npm run check` vert, captures d'écran à jour, commit, `git push`, cocher le point ici (⬜ → ✅).
+- **Notifications (outil `PushNotification`, arrive sur le téléphone du propriétaire via Remote Control)** — message d'une ligne, < 200 caractères, en français, qui commence par l'action attendue. Envoyer **uniquement** dans ces cas :
+  1. **question vraiment bloquante** : impossible d'avancer sur aucun point de la roadmap sans la réponse (ex. « Question bloquante : retirer pixi.js du package.json ? Voir docs/QUESTIONS.md ») ;
+  2. **échec qui bloque tout** : `npm run check` ou le déploiement en échec après plusieurs tentatives ;
+  3. **feature terminée et poussée** : une notification courte (ex. « Feature Sauvegarde auto en ligne, à tester sur iPhone ») ;
+  4. **roadmap entièrement terminée**.
+
+  Jamais pour la progression de routine ni pour une question non bloquante (celle-ci va dans `docs/QUESTIONS.md` et le travail continue sur le point suivant).
+
 - **Graphismes** : toute spec qui touche à l'affichage contient une section « Rendu » qui détaille les visuels selon la section « Priorité transversale » ci-dessus. Une feature au rendu simpliste n'est pas terminée.
 - Les règles de `CLAUDE.md` priment toujours (sim pure, centimes, mobile first, 100 % navigateur).

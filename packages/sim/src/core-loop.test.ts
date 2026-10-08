@@ -701,7 +701,16 @@ describe("tick: revenue", () => {
     expect(t.fleet.map((c) => c.id)).toEqual(g.fleet.map((c) => c.id));
     expect(t.fleet.map((c) => c.dailyPrice)).toEqual(g.fleet.map((c) => c.dailyPrice));
     expect(t.fleet.map((c) => c.dailyCost)).toEqual(g.fleet.map((c) => c.dailyCost));
-    expect(Object.keys(t).sort()).toEqual(["cash", "day", "fleet", "lastDay", "rngState", "seed"]);
+    expect(Object.keys(t).sort()).toEqual([
+      "cash",
+      "day",
+      "fleet",
+      "lastDay",
+      "minute",
+      "rngState",
+      "seed",
+      "todayRevenue",
+    ]);
     for (const c of t.fleet) {
       expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "rented"]);
     }
@@ -743,9 +752,10 @@ describe("tick: immutability", () => {
     t.fleet.forEach((c, i) => expect(c).not.toBe(g.fleet[i]));
   });
 
-  it("empty fleet still yields a new array", () => {
+  it("empty fleet: no slot is crossed, so the fleet reference is reused but the state is new", () => {
     const g = createGame(1);
-    expect(tick(g).fleet).not.toBe(g.fleet);
+    expect(tick(g)).not.toBe(g);
+    expect(tick(g).fleet).toBe(g.fleet);
   });
 
   it("does not mutate the input", () => {
@@ -1011,23 +1021,23 @@ describe("advance", () => {
 // Overflow
 // ---------------------------------------------------------------------------
 describe("overflow", () => {
-  it("positive overflow at the edge: 2 days succeed (cash == MAX_SAFE_INTEGER), 3 throw", () => {
-    const g = createGame(1, Number.MAX_SAFE_INTEGER - 2 * 85_00, PROFITABLE);
+  it("positive overflow at the edge (live cash): day 1 succeeds, day 2 overflows at car 2's slot", () => {
+    const g = createGame(1, Number.MAX_SAFE_INTEGER - 150_00, PROFITABLE);
     const copy = clone(g);
-    expect(advance(g, 2).cash).toBe(Number.MAX_SAFE_INTEGER);
-    expectOverflow(() => advance(g, 3), "cash");
+    expect(advance(g, 1).cash).toBe(Number.MAX_SAFE_INTEGER - 65_00);
+    expectOverflow(() => advance(g, 2), "cash");
     expect(g).toEqual(copy);
   });
 
-  it("tick throws exactly when cash + net exceeds MAX_SAFE_INTEGER", () => {
-    const ok = createGame(1, Number.MAX_SAFE_INTEGER - 85_00, PROFITABLE);
-    expect(tick(ok).cash).toBe(Number.MAX_SAFE_INTEGER);
-    const bad = createGame(1, Number.MAX_SAFE_INTEGER - 85_00 + 1, PROFITABLE);
+  it("tick throws exactly when cash + revenue (before costs) exceeds MAX_SAFE_INTEGER", () => {
+    const ok = createGame(1, Number.MAX_SAFE_INTEGER - 150_00, PROFITABLE);
+    expect(tick(ok).cash).toBe(Number.MAX_SAFE_INTEGER - 65_00);
+    const bad = createGame(1, Number.MAX_SAFE_INTEGER - 150_00 + 1, PROFITABLE);
     expectOverflow(() => tick(bad), "cash");
   });
 
   it("overflow inside advance exposes no partial state and leaves a frozen input intact", () => {
-    const g = deepFreeze(createGame(1, Number.MAX_SAFE_INTEGER - 85_00, PROFITABLE));
+    const g = deepFreeze(createGame(1, Number.MAX_SAFE_INTEGER - 150_00, PROFITABLE));
     const copy = clone(g);
     expectOverflow(() => advance(g, 10), "cash");
     expect(g).toEqual(copy);
