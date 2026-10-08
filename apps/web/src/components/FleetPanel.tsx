@@ -15,7 +15,7 @@ export function FleetPanel({ fleet, onSetPrice }: FleetPanelProps) {
           Votre parking est vide. Achetez votre première voiture pour commencer à louer.
         </p>
       ) : (
-        <ul className="panel" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        <ul className="fleet-list">
           {fleet.map((car) => (
             <CarRow
               key={car.id}

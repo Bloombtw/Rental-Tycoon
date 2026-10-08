@@ -5,20 +5,29 @@ interface MessageBannerProps {
 }
 
 export function MessageBanner({ error, notice, onDismiss }: MessageBannerProps) {
-  const text = error ?? notice;
-  if (text === null || text === "") return null;
-  const isError = error !== null;
+  const errorText = error !== null && error !== "" ? error : null;
+  const noticeText = errorText === null && notice !== null && notice !== "" ? notice : null;
   return (
-    <div
-      className="banner"
-      data-kind={isError ? "error" : "notice"}
-      data-testid={isError ? "error-banner" : "notice"}
-      role={isError ? "alert" : "status"}
-    >
-      <span>{text}</span>
-      <button type="button" className="btn" onClick={onDismiss}>
-        Fermer
-      </button>
+    <div className="banner-slot">
+      {/* Live region stays mounted so screen readers announce the text when it appears. */}
+      <div role="status" aria-live="polite">
+        {noticeText !== null && (
+          <div className="banner" data-kind="notice" data-testid="notice">
+            <span>{noticeText}</span>
+            <button type="button" className="btn" onClick={onDismiss}>
+              Fermer
+            </button>
+          </div>
+        )}
+      </div>
+      {errorText !== null && (
+        <div className="banner" data-kind="error" data-testid="error-banner" role="alert">
+          <span>{errorText}</span>
+          <button type="button" className="btn" onClick={onDismiss}>
+            Fermer
+          </button>
+        </div>
+      )}
     </div>
   );
 }

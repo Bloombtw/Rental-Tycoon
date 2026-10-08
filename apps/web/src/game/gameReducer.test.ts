@@ -19,12 +19,7 @@ import {
   type UiState,
 } from "./gameReducer.js";
 import { PRICE_RANGE_ERROR, errorMessage } from "./messages.js";
-import {
-  FleetFullError,
-  InsufficientCashError,
-  UnknownCarError,
-  UnknownCarModelError,
-} from "@rt/sim";
+import { FleetFullError, InsufficientCashError } from "@rt/sim";
 
 const IDLE: readonly NewCar[] = [
   { dailyPrice: 200_00, dailyCost: 30_00 },
@@ -80,6 +75,9 @@ describe("gameReducer", () => {
     const s = gameReducer(start, { type: "buyCar", model: "used" });
     expect(s.game).toBe(start.game);
     expect(s.error).toBe(errorMessage(new InsufficientCashError(CAR_MODELS.used.purchasePrice, 0)));
+    expect((s.error ?? "").replace(/\s/g, " ")).toBe(
+      "Fonds insuffisants : il faut 4 000,00 €, vous avez 0,00 €.",
+    );
     expect(s.notice).toBeNull();
   });
 
@@ -107,7 +105,7 @@ describe("gameReducer", () => {
     for (const model of ["truck", "__proto__", "toString", "constructor", null, undefined, 1, {}]) {
       const s = gameReducer(start, forge({ type: "buyCar", model }));
       expect(s.game).toBe(start.game);
-      expect(s.error).toBe(errorMessage(new UnknownCarModelError(model)));
+      expect(s.error).toBe("Modèle de voiture inconnu.");
       expect(s.notice).toBeNull();
     }
   });
@@ -116,7 +114,7 @@ describe("gameReducer", () => {
     const g = tick(createGame(1, 50_000_00, MIXED));
     const start = initUiState(g);
     const a = gameReducer(start, { type: "setCarPrice", carId: 99, dailyPrice: 100 });
-    expect(a.error).toBe(errorMessage(new UnknownCarError(99)));
+    expect(a.error).toBe("Cette voiture n'existe pas.");
     expect(a.game).toBe(g);
     const b = gameReducer(start, { type: "setCarPrice", carId: 1, dailyPrice: NaN });
     expect(b.error).toBe(PRICE_RANGE_ERROR);
@@ -128,7 +126,7 @@ describe("gameReducer", () => {
     }
     for (const carId of ["1", null, undefined, NaN, 1n, "__proto__", {}, [1]]) {
       const s = gameReducer(start, forge({ type: "setCarPrice", carId, dailyPrice: 100 }));
-      expect(s.error).toBe(errorMessage(new UnknownCarError(carId)));
+      expect(s.error).toBe("Cette voiture n'existe pas.");
       expect(s.game).toBe(g);
     }
   });

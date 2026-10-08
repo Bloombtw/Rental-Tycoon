@@ -52,13 +52,13 @@
 }
 
 .hud-cash {
-  color: var(--c-money);
+  color: var(--c-money-on-dark);
   font-weight: 700;
   transition: color var(--transition);
 }
 
 .hud-cash[data-negative="true"] {
-  color: var(--c-danger);
+  color: var(--c-danger-on-dark);
 }
 
 .hud-report {
@@ -67,7 +67,7 @@
 }
 
 .hud-report[data-sign="negative"] {
-  color: var(--c-danger);
+  color: var(--c-danger-on-dark);
 }
 
 /* Buttons */
@@ -78,7 +78,7 @@
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-4);
   background: var(--c-accent);
-  color: var(--c-on-dark);
+  color: var(--c-ink); /* 5.07:1; white on --c-accent is only 3.4:1 */
   box-shadow: var(--shadow);
   cursor: pointer;
   transition:
@@ -119,7 +119,19 @@
 }
 
 .banner[data-kind="notice"] {
-  background: var(--c-money);
+  background: var(--c-money-strong);
+}
+
+/* Container of the always-mounted live region and the error banner. */
+.banner-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Without a visible banner, leave the layout flow but stay in the accessibility tree. */
+.banner-slot:not(:has(.banner)) {
+  position: absolute;
 }
 
 .banner[data-kind="error"] {
@@ -181,7 +193,7 @@
 }
 
 .badge[data-status="rented"] {
-  background: var(--c-money);
+  background: var(--c-money-strong);
 }
 
 .badge[data-status="parked"] {
@@ -216,7 +228,7 @@
 }
 
 .field-error {
-  color: var(--c-danger);
+  color: var(--c-danger-text);
   font-size: 0.85rem;
   flex-basis: 100%;
 }
@@ -236,8 +248,23 @@
   font-size: 0.85rem;
 }
 
+.buy-refusal {
+  color: var(--c-danger-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.fleet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 /* Error boundary fallback */
 .error-fallback {
   text-align: center;
-  color: var(--c-danger);
+  color: var(--c-danger-text);
 }

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { CAR_MODELS, CAR_MODEL_IDS, MAX_FLEET_SIZE, type CarModelId, type Cents } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { CAR_MODEL_LABELS } from "../game/messages.js";
@@ -10,6 +11,7 @@ interface BuyCarPanelProps {
 }
 
 export function BuyCarPanel({ cash, fleetSize, highlight, onBuy }: BuyCarPanelProps) {
+  const baseId = useId();
   const full = fleetSize >= MAX_FLEET_SIZE;
   return (
     <section className="card panel" data-highlight={String(highlight)} aria-labelledby="buy-title">
@@ -33,13 +35,18 @@ export function BuyCarPanel({ cash, fleetSize, highlight, onBuy }: BuyCarPanelPr
               className="btn"
               data-testid={`buy-${id}`}
               disabled={reason !== null}
+              aria-describedby={reason !== null ? `${baseId}-${id}-refusal` : undefined}
               onClick={() => {
                 onBuy(id);
               }}
             >
               Acheter
             </button>
-            {reason !== null && <p className="buy-hint">{reason}</p>}
+            {reason !== null && (
+              <p className="buy-refusal" id={`${baseId}-${id}-refusal`}>
+                {reason}
+              </p>
+            )}
           </div>
         );
       })}

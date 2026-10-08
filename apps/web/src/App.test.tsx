@@ -159,7 +159,10 @@ describe("App: purchase and day flow", () => {
     expect(norm(row.textContent)).toContain(norm(formatCents(60_00)));
     expect(cashText()).toBe(norm(formatCents(50_000_00 - CAR_MODELS.compact.purchasePrice)));
     expect(cashText()).toBe("41 000,00 €");
-    expect(byId("notice").getAttribute("role")).toBe("status");
+    expect(byId("notice").closest('[role="status"]')).not.toBeNull();
+    expect(container.querySelector('[role="status"]')?.textContent).toContain(
+      byId("notice").textContent,
+    );
     expect(maybeId("fleet-empty")).toBeNull();
     assertClean();
   });
@@ -314,8 +317,12 @@ describe("App: price field attacks", () => {
     expect(priceInput(1).value).toBe("7,00");
   });
 
-  // SPEC GAP (not asserted): re-submitting the unchanged price (typing "60" when the price is
-  // already 60,00) leaves the raw text "60" in the field because resync only fires on change.
+  it("re-submitting the unchanged price normalises the field text to the sim price", () => {
+    mountApp(createGame(1, 50_000_00, FIXTURE));
+    setPrice(1, "60");
+    expect(priceInput(1).value).toBe(formatCentsForInput(60_00));
+    expect(priceInput(1).value).toBe("60,00");
+  });
 });
 
 describe("App: buying limits", () => {
@@ -324,8 +331,19 @@ describe("App: buying limits", () => {
     const used = byId("buy-used") as HTMLButtonElement;
     expect(used.disabled).toBe(true);
     expect(used.parentElement?.textContent).toContain("Fonds insuffisants");
-    for (const id of ["compact", "hybrid"]) {
-      expect((byId(`buy-${id}`) as HTMLButtonElement).disabled).toBe(true);
+    for (const id of ["used", "compact", "hybrid"]) {
+      const btn = byId(`buy-${id}`) as HTMLButtonElement;
+      expect(btn.disabled).toBe(true);
+      const ref = btn.getAttribute("aria-describedby");
+      expect(ref).toBeTruthy();
+      expect(document.getElementById(ref ?? "")?.textContent).toBe("Fonds insuffisants");
+    }
+  });
+
+  it("enabled buy buttons carry no aria-describedby", () => {
+    mountApp();
+    for (const id of ["used", "compact", "hybrid"]) {
+      expect(byId(`buy-${id}`).hasAttribute("aria-describedby")).toBe(false);
     }
   });
 
@@ -342,7 +360,13 @@ describe("App: buying limits", () => {
     }));
     mountApp(createGame(1, 10 ** 12, fleet));
     for (const id of ["used", "compact", "hybrid"]) {
-      expect((byId(`buy-${id}`) as HTMLButtonElement).disabled).toBe(true);
+      const btn = byId(`buy-${id}`) as HTMLButtonElement;
+      expect(btn.disabled).toBe(true);
+      const ref = btn.getAttribute("aria-describedby");
+      expect(ref).toBeTruthy();
+      expect(document.getElementById(ref ?? "")?.textContent).toBe(
+        `Flotte complète (${MAX_FLEET_SIZE}/${MAX_FLEET_SIZE})`,
+      );
     }
     expect(container.textContent).toContain(`Flotte ${MAX_FLEET_SIZE}/${MAX_FLEET_SIZE}`);
     expect(container.textContent).toContain("Flotte complète");

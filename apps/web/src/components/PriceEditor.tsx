@@ -31,6 +31,8 @@ export function PriceEditor({ carId, dailyPrice, onSubmit }: PriceEditorProps) {
       return;
     }
     setProblem(null);
+    // Normalise the field even when the price is unchanged ("60" becomes "60,00").
+    setText(formatCentsForInput(parsed.cents));
     onSubmit(parsed.cents);
   }
 
