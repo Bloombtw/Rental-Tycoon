@@ -24,6 +24,9 @@
       "Bash(git push --force*)",
       "Bash(git reset --hard*)",
       "Bash(rm -rf *)",
+      "Bash(sed -i*)",
+      "Bash(mv *)",
+      "Bash(cp *)",
       "Bash(curl *)",
       "Bash(wget *)"
     ]

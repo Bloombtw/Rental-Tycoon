@@ -5,7 +5,9 @@ const PROTECTED = [
   /^\.\./i, // anything outside the repo
   /^\.env(\..*)?$/i,
   /^package-lock\.json$/i,
-  /^\.claude\/(settings\.json|hooks\/)/i,
+  /^\.claude\//i, // agents, hooks, commands, settings: the harness itself
+  /^CLAUDE\.md$/i,
+  /^\.mcp\.json$/i,
   /^\.github\/workflows\//i,
   /^\.husky\//i,
   /^\.git\//i,

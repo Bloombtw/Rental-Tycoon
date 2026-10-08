@@ -24,6 +24,11 @@ describe("protect-files hook", () => {
     "package-lock.json",
     ".claude/settings.json",
     ".claude/hooks/lib.mjs",
+    ".claude/agents/sim-engineer.md",
+    ".claude/commands/feature.md",
+    "CLAUDE.md",
+    "claude.md",
+    ".mcp.json",
     ".github/workflows/ci.yml",
     ".husky/pre-commit",
     "../outside.txt",
@@ -34,7 +39,7 @@ describe("protect-files hook", () => {
     expect(run("protect-files.mjs", file)).toBe(BLOCKED);
   });
 
-  it.each(["packages/sim/src/a.ts", abs("apps/web/src/App.tsx"), ".claude/agents/x.md"])(
+  it.each(["packages/sim/src/a.ts", abs("apps/web/src/App.tsx"), "docs/specs/x.md", "README.md"])(
     "allows %s",
     (file) => {
       expect(run("protect-files.mjs", file)).toBe(0);
