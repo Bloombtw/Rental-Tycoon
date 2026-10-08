@@ -6,10 +6,14 @@ model: sonnet
 color: red
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
       hooks:
         - type: command
           command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-scope.mjs" *.test.ts *.test.tsx e2e/
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-bash.mjs"
 ---
 
 Your job is to break the app the way the grader will: the teacher will literally try to break it.

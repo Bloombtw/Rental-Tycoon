@@ -63,3 +63,69 @@ describe("guard-scope hook", () => {
     expect(run("guard-scope.mjs", "packages/sim/src/tick.ts", qa)).toBe(BLOCKED);
   });
 });
+
+describe("guard-bash hook", () => {
+  function bash(command: string): number | null {
+    return spawnSync("node", [hook("guard-bash.mjs")], {
+      input: JSON.stringify({ tool_input: { command } }),
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+      encoding: "utf8",
+    }).status;
+  }
+
+  it.each([
+    "npm run check",
+    "npm run typecheck",
+    "npm run test",
+    "npm test",
+    "npm run dev:web",
+    "npx vitest run --project sim",
+    "npx vitest run packages/sim/src/sim.test.ts",
+    'npx vitest run --project sim -t "rejects absurd ranges"',
+    "git status",
+    "git diff --stat HEAD~1",
+    "git log --oneline -5",
+    "git branch --show-current",
+  ])("allows %s", (cmd) => {
+    expect(bash(cmd)).toBe(0);
+  });
+
+  it.each([
+    // writes and redirections
+    "echo hi > apps/web/src/App.tsx",
+    "cat x >> y",
+    "npm run check | tee out.txt",
+    "sed -i s/a/b/ apps/web/src/App.tsx",
+    "cp a b",
+    "mv a b",
+    "rm -rf apps",
+    "node -e \"require('fs').writeFileSync('x','y')\"",
+    "python -c 1",
+    "touch apps/web/x.ts",
+    // chaining and substitution
+    "npm run check && rm -rf .",
+    "npm run check; rm x",
+    "git status $(rm x)",
+    "git status `rm x`",
+    "npm run check\nrm x",
+    // allowed tools used to write
+    "npm run lint:fix",
+    "npm run format",
+    "npm run test -w @rt/sim",
+    "npm run x --prefix packages/sim",
+    "npx vitest run -u",
+    "npx vitest run --update",
+    "npx vitest run --outputFile=x.json",
+    "npx eslint --fix apps",
+    "npx prettier --write .",
+    "npx tsc --outDir ../x",
+    "git diff --output=apps/web/src/App.tsx",
+    "git checkout -- apps",
+    "git commit -m x",
+    "git push",
+    "npm install left-pad",
+    "",
+  ])("refuses %j", (cmd) => {
+    expect(bash(cmd)).toBe(BLOCKED);
+  });
+});

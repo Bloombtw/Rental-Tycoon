@@ -20,7 +20,7 @@ Dependency direction: `web → sim`, `server → sim`. `sim` imports nothing fro
 - The main session orchestrates; it delegates code to the owner agents instead of writing it itself. Use `/feature` for anything non-trivial.
 - No code without a spec in `docs/specs/` first.
 - Launch independent agents **in parallel in one message**. Hand each one the spec path and the exact contract (types, function signatures, routes) so parallel work fits together.
-- Agents write only inside their scope (enforced by hooks). Never use Bash to work around it (no `sed -i`, `echo >` or file moves outside your scope). Report cross-scope needs to the lead.
+- Agents write only inside their scope: Edit/Write are checked by `guard-scope`, and Bash is limited by `guard-bash` to an allowlist of verification commands (npm scripts, vitest, read-only git). Files are changed with Edit/Write only. Report cross-scope needs to the lead.
 - A feature is done only when `npm run check` is green, `qa-breaker` has attacked it and `reviewer` approved.
 
 ## Rules that are always true
