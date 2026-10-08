@@ -22,7 +22,9 @@ Your output is a spec, never code. Write it to `docs/specs/<feature>.md` using t
 4. **Player actions**: each action with its preconditions and every invalid case (no cash, absurd value, wrong state...).
 5. **UI**: what is shown and where, and what feedback each action gives.
 6. **Server**: what must be persisted or validated server-side, if anything.
-7. **Acceptance criteria**: a checklist QA can test, including edge cases.
+7. **Acceptance criteria**: at most 20, each one something the player can actually do or see ("buying a car with too little cash is refused and shows a message"). Purely technical edge cases (-0, prototype keys, float precision, overflow) are not your job: qa-breaker handles them.
 8. **Split**: which owner (sim / backend / frontend) does what, and in which order, so the lead can run them in parallel.
+
+Keep the spec short (aim for 1-2 pages). Write it once: if something is undecided, list it under a final **Open questions** section with your recommendation instead of rewriting the spec. Only revise when the user asks.
 
 Keep the economy coherent with `docs/specs/economy.md` if it exists. Prefer depth (interlocking systems) over a long list of shallow features.

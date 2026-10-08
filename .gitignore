@@ -8,3 +8,7 @@ coverage
 apps/server/data
 .claude/settings.local.json
 dist-types
+
+# Playwright MCP output (screenshots, page snapshots, console logs)
+screenshots/*
+!screenshots/.gitkeep

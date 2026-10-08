@@ -21,4 +21,4 @@ Check, in this order:
 3. Correctness bugs and unhandled edge cases.
 4. Does `npm run check` pass?
 
-Output: a verdict **APPROVE** or **CHANGES REQUESTED**, then a list of findings (file:line, problem, owner who should fix it). No style nitpicks Prettier would handle.
+Output: a verdict **APPROVE** or **CHANGES REQUESTED**, then a list of findings (file:line, problem, owner who should fix it). Mark each finding **blocking** (wrong behavior, broken rule, spec not met) or **suggestion**; only blocking findings justify CHANGES REQUESTED. Don't ask for more tests on inputs no player or API call can produce. No style nitpicks Prettier would handle.
