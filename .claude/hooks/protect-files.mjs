@@ -6,7 +6,8 @@ const PROTECTED = [
   /^\.env(\..*)?$/i,
   /^package-lock\.json$/i,
   /(^|\/)package\.json$/i, // root and workspace manifests (scripts, deps)
-  /(^|\/)vitest\.config\.ts$/i, // test setup must not be weakened by agents
+  // Vite/Vitest configs (any extension, so an agent can't add an overriding vitest.config.mts).
+  /(^|\/)vite(st)?\.config\.[cm]?[jt]s$/i,
   /^\.claude\//i, // agents, hooks, commands, settings: the harness itself
   /^CLAUDE\.md$/i,
   /^\.mcp\.json$/i,
