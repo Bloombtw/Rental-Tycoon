@@ -80,7 +80,7 @@ export function App(props: { initialGame?: GameState; clockDriver?: ClockDriver 
       <MessageBanner error={ui.error} notice={ui.notice} onDismiss={onDismissMessage} />
       <div className="stage">
         <ErrorBoundary fallback={<AgencyFallback />}>
-          <AgencyView game={game} paused={ui.paused} pendingRef={pendingRef} />
+          <AgencyView game={game} paused={ui.paused} speed={ui.speed} pendingRef={pendingRef} />
         </ErrorBoundary>
         {ui.dayBanner !== null && (
           <DayBanner text={ui.dayBanner} speed={ui.speed} onDismiss={onDismissBanner} />

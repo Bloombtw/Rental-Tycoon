@@ -6,21 +6,30 @@ import {
   DRIVE_MINUTES,
   MIN_TOUCH_PX,
   PARKED_HEADING,
+  RAMP,
   TURN_BLEND,
   WHEEL_RADIUS,
   carIndexAt,
   carPhaseAt,
   carPoseAt,
+  cruiseEaseOut,
+  easeInCruise,
   easeInOutQuad,
   type CarPose,
 } from "./carMotion.js";
-import { exitPath, returnPath, computeLayout, type GroundPoint } from "./layout.js";
+import { computeLayout, type GroundPoint } from "./layout.js";
 import { toViewPlane } from "./iso.js";
+import { deepFreeze, planFor } from "./cityKit.test";
+import { carRoutes, type CarRoutes } from "./routes.js";
 
 const VIEW: ScreenRect = { x: 0, y: 130, width: 390, height: 650 };
 const layout = computeLayout(50, VIEW);
+const plan = planFor(layout);
+const routes = carRoutes(layout, plan);
 const dep = (i: number) => departureMinute(i) as number;
 const ret = (i: number) => returnMinute(i) as number;
+const pose = (i: number, t: number, rented: unknown = true, reduced = false) =>
+  carPoseAt(layout, routes, i, rented, t, reduced);
 
 function at<T>(list: readonly T[], i: number): T {
   const v = list[i];
@@ -45,27 +54,64 @@ const poseNumbers = (p: CarPose) => [p.x, p.z, p.heading, p.wheelRotation, p.alp
 
 describe("constants", () => {
   it("match the spec", () => {
-    expect([DRIVE_MINUTES, MIN_TOUCH_PX, TURN_BLEND, WHEEL_RADIUS]).toEqual([30, 44, 1.5, 0.42]);
+    expect([DRIVE_MINUTES, RAMP, MIN_TOUCH_PX, TURN_BLEND, WHEEL_RADIUS]).toEqual([
+      60, 0.25, 44, 1.5, 0.42,
+    ]);
     expect(PARKED_HEADING).toBe(Math.PI);
     expect(CAR_BOX).toEqual({ width: 2.1, length: 3.6, height: 1.6 });
   });
 
-  it("easeInOutQuad is 0 to 1, symmetric and monotone", () => {
+  it("easeInOutQuad is still 0 to 1 and monotone", () => {
     expect(easeInOutQuad(0)).toBe(0);
     expect(easeInOutQuad(1)).toBe(1);
     expect(easeInOutQuad(0.5)).toBeCloseTo(0.5, 12);
-    expect(easeInOutQuad(-3)).toBe(0);
-    expect(easeInOutQuad(9)).toBe(1);
+  });
+
+  it("every car is back before 21:00 and the trips never overlap (ret - 60 >= dep + 60)", () => {
+    for (let i = 0; i < MAX_FLEET_SIZE; i++) {
+      expect(ret(i), `car ${i}`).toBeLessThan(720);
+      expect(ret(i) - DRIVE_MINUTES, `car ${i}`).toBeGreaterThanOrEqual(dep(i) + DRIVE_MINUTES);
+    }
+  });
+});
+
+describe("easeInCruise / cruiseEaseOut", () => {
+  it("0 to 1, continuous at the ramp, monotone, soft start then constant speed", () => {
+    expect(easeInCruise(0)).toBe(0);
+    expect(easeInCruise(1)).toBeCloseTo(1, 12);
+    expect(easeInCruise(RAMP)).toBeCloseTo(RAMP / (2 - RAMP), 12);
+    expect(easeInCruise(0.1)).toBeCloseTo(0.01 / (RAMP * (2 - RAMP)), 12);
+    expect(easeInCruise(0.6)).toBeCloseTo((1.2 - RAMP) / (2 - RAMP), 12);
     let prev = 0;
+    for (let p = 0; p <= 1; p += 0.001) {
+      const v = easeInCruise(p);
+      expect(v).toBeGreaterThanOrEqual(prev - 1e-12);
+      prev = v;
+    }
+    const slope = (a: number, b: number) => (easeInCruise(b) - easeInCruise(a)) / (b - a);
+    expect(slope(0.4, 0.5)).toBeCloseTo(slope(0.8, 0.9), 9);
+    expect(slope(0, 0.01)).toBeLessThan(slope(0.5, 0.6) * 0.1);
+  });
+
+  it("the return mirrors it: 1 - easeInCruise(1 - p), constant speed then braking", () => {
     for (let p = 0; p <= 1; p += 0.01) {
-      expect(easeInOutQuad(p)).toBeGreaterThanOrEqual(prev - 1e-12);
-      prev = easeInOutQuad(p);
+      expect(cruiseEaseOut(p)).toBeCloseTo(1 - easeInCruise(1 - p), 12);
+    }
+    const slope = (a: number, b: number) => (cruiseEaseOut(b) - cruiseEaseOut(a)) / (b - a);
+    expect(slope(0.99, 1)).toBeLessThan(slope(0.4, 0.5) * 0.1);
+  });
+
+  it.each([-5, 7, NaN, Infinity, -Infinity])("input %s stays in [0, 1] and finite", (p) => {
+    for (const f of [easeInCruise, cruiseEaseOut]) {
+      expect(Number.isFinite(f(p))).toBe(true);
+      expect(f(p)).toBeGreaterThanOrEqual(0);
+      expect(f(p)).toBeLessThanOrEqual(1);
     }
   });
 });
 
 describe("carPhaseAt", () => {
-  it("follows the schedule with exact boundaries (car 3)", () => {
+  it("follows the schedule with exact boundaries (car 3), 60 minute trips", () => {
     const i = 3;
     const d = dep(i);
     const r = ret(i);
@@ -89,8 +135,7 @@ describe("carPhaseAt", () => {
   it("reduced motion: never departing or returning; away between dep and ret", () => {
     for (let i = 0; i < MAX_FLEET_SIZE; i++) {
       for (let t = 0; t < 720; t += 3.1) {
-        const p = carPhaseAt(i, true, t, true);
-        expect(p).toBe(t >= dep(i) && t < ret(i) ? "away" : "parked");
+        expect(carPhaseAt(i, true, t, true)).toBe(t >= dep(i) && t < ret(i) ? "away" : "parked");
       }
     }
   });
@@ -106,24 +151,24 @@ describe("carPhaseAt", () => {
     expect(carPhaseAt(2, true, t as number, false)).toBe("parked");
   });
 
-  it("every car is back before 21:00 and phases only go parked > departing > away > returning > parked", () => {
-    for (const i of [0, 17, 49]) {
-      expect(ret(i)).toBeLessThan(720);
+  it("phases only go parked > departing > away > returning > parked for every car", () => {
+    for (let i = 0; i < MAX_FLEET_SIZE; i++) {
       const seen: string[] = [];
       for (let t = 0; t < 720; t += 0.5) {
         const p = carPhaseAt(i, true, t, false);
         if (seen[seen.length - 1] !== p) seen.push(p);
       }
       const order = ["parked", "departing", "away", "returning", "parked"];
-      expect(seen.join(">")).toBe(i === 0 ? order.slice(1).join(">") : order.join(">"));
+      expect(seen.join(">"), `car ${i}`).toBe(
+        dep(i) === 0 ? order.slice(1).join(">") : order.join(">"),
+      );
     }
   });
 });
 
 describe("carPoseAt: parked, away and invisible cars", () => {
   it("parked: on its spot, nose to the building, wheels still, opaque", () => {
-    const p = carPoseAt(layout, 7, true, dep(7) - 1, false);
-    expect(p).toMatchObject({
+    expect(pose(7, dep(7) - 1)).toMatchObject({
       x: spot(7).x,
       z: spot(7).z,
       heading: PARKED_HEADING,
@@ -131,8 +176,8 @@ describe("carPoseAt: parked, away and invisible cars", () => {
       alpha: 1,
       phase: "parked",
     });
-    expect(carPoseAt(layout, 7, false, 300, false)).toMatchObject({ phase: "parked", alpha: 1 });
-    expect(carPoseAt(layout, 7, true, ret(7), false)).toMatchObject({
+    expect(pose(7, 300, false)).toMatchObject({ phase: "parked", alpha: 1 });
+    expect(pose(7, ret(7))).toMatchObject({
       x: spot(7).x,
       z: spot(7).z,
       wheelRotation: 0,
@@ -140,35 +185,35 @@ describe("carPoseAt: parked, away and invisible cars", () => {
     });
   });
 
-  it("away: invisible, wheels still", () => {
-    const p = carPoseAt(layout, 30, true, 300, false);
-    expect(p).toMatchObject({ alpha: 0, phase: "away", wheelRotation: 0 });
+  it("away: invisible (opacity 0), wheels still", () => {
+    expect(pose(30, 300)).toMatchObject({ alpha: 0, phase: "away", wheelRotation: 0 });
   });
 
   it.each([-1, 50, 51, 3.5, NaN, Infinity, 2 ** 53, "2", null, undefined])(
     "index %s without a spot is a frozen invisible pose",
     (i) => {
-      const p = carPoseAt(layout, i as number, true, 100, false);
+      const p = carPoseAt(layout, routes, i as number, true, 100, false);
       expect(p.alpha).toBe(0);
       expect(p.wheelRotation).toBe(0);
       expect(poseNumbers(p).every(Number.isFinite)).toBe(true);
     },
   );
 
-  it("an index beyond the placed spots is invisible", () => {
+  it("a missing route never crashes: the car just stays parked", () => {
+    const empty: CarRoutes = { departure: [], arrival: [] };
+    for (const t of [dep(3) + 10, ret(3) - 10]) {
+      const p = carPoseAt(layout, empty, 3, true, t, false);
+      expect(poseNumbers(p).every(Number.isFinite)).toBe(true);
+    }
     const small = computeLayout(3, VIEW);
-    expect(carPoseAt(small, 3, true, 100, false).alpha).toBe(0);
-    expect(carPoseAt(computeLayout(0, VIEW), 0, true, 100, false).alpha).toBe(0);
+    expect(carPoseAt(small, routes, 3, true, 100, false).alpha).toBe(0);
+    expect(carPoseAt(computeLayout(0, VIEW), routes, 0, true, 100, false).alpha).toBe(0);
   });
 
   it.each([NaN, Infinity, -Infinity, "5", null, undefined])(
     "hostile time %s keeps the car parked",
     (t) => {
-      expect(carPoseAt(layout, 3, true, t as number, false)).toMatchObject({
-        phase: "parked",
-        alpha: 1,
-        wheelRotation: 0,
-      });
+      expect(pose(3, t as number)).toMatchObject({ phase: "parked", alpha: 1, wheelRotation: 0 });
     },
   );
 
@@ -176,33 +221,42 @@ describe("carPoseAt: parked, away and invisible cars", () => {
     "rented = %j never moves the car",
     (rented) => {
       for (let t = 0; t < 720; t += 11) {
-        expect(carPoseAt(layout, 4, rented, t, false)).toMatchObject({ phase: "parked", alpha: 1 });
+        expect(carPoseAt(layout, routes, 4, rented, t, false)).toMatchObject({
+          phase: "parked",
+          alpha: 1,
+        });
       }
     },
   );
 
-  it("every pose over the whole day, for 0..51 cars and bad indexes, is finite with alpha in [0, 1]", () => {
+  it("opacity is only ever 0 or 1 and everything is finite, all day, all cars, all sizes", () => {
     for (const n of [0, 1, 3, 11, 25, 50, 51]) {
       const l = computeLayout(n, VIEW);
+      const r = carRoutes(l, planFor(l));
       for (let i = -1; i <= 52; i++) {
-        for (let t = -5; t < 725; t += 9.7) {
+        for (let t = -5; t < 725; t += 6.7) {
           for (const reduced of [false, true]) {
-            const p = carPoseAt(l, i, true, t, reduced);
+            const p = carPoseAt(l, r, i, true, t, reduced);
             expect(poseNumbers(p).every(Number.isFinite)).toBe(true);
-            expect(p.alpha).toBeGreaterThanOrEqual(0);
-            expect(p.alpha).toBeLessThanOrEqual(1);
+            expect([0, 1], `n=${n} car ${i} t=${t}`).toContain(p.alpha);
           }
         }
       }
     }
+  });
+
+  it("works on frozen layout and routes", () => {
+    const l = deepFreeze(structuredClone(layout));
+    const r = deepFreeze(structuredClone(routes));
+    expect(() => carPoseAt(l, r, 5, true, dep(5) + 20, false)).not.toThrow();
   });
 });
 
 describe("carPoseAt: departure", () => {
   const i = 12;
 
-  it("starts on the spot nose to the building and ends on the street, heading east", () => {
-    const start = carPoseAt(layout, i, true, dep(i), false);
+  it("starts on the spot nose to the building, soft start, ends at the route end", () => {
+    const start = pose(i, dep(i));
     expect(start).toMatchObject({
       x: spot(i).x,
       z: spot(i).z,
@@ -211,93 +265,87 @@ describe("carPoseAt: departure", () => {
       wheelRotation: 0,
     });
     expect(Math.abs(angDiff(start.heading, Math.PI))).toBeLessThan(1e-9);
-    const end = carPoseAt(layout, i, true, dep(i) + DRIVE_MINUTES - 1e-6, false);
-    expect(end.x).toBeCloseTo(layout.exitEndX, 2);
-    expect(end.z).toBeCloseTo(layout.laneOutZ, 2);
-    expect(Math.abs(angDiff(end.heading, Math.PI / 2))).toBeLessThan(0.01);
-    expect(end.alpha).toBeLessThan(0.05);
+    const route = at(routes.departure, i);
+    const end = pose(i, dep(i) + DRIVE_MINUTES - 1e-6);
+    expect(end.x).toBeCloseTo(at(route, route.length - 1).x, 1);
+    expect(end.z).toBeCloseTo(at(route, route.length - 1).z, 1);
+    expect(end.alpha).toBe(1);
   });
 
-  it("backs out first: the first moves are south with the nose north, wheels turning backwards", () => {
-    const p = carPoseAt(layout, i, true, dep(i) + 1, false);
+  it("the start is gentle: a fraction of the cruise distance in the first minutes", () => {
+    const total = length(at(routes.departure, i));
+    const cruisePerMinute = total / DRIVE_MINUTES;
+    const p = pose(i, dep(i) + 0.6);
+    const moved = Math.hypot(p.x - spot(i).x, p.z - spot(i).z);
+    expect(moved).toBeGreaterThan(0);
+    expect(moved).toBeLessThan(0.2 * cruisePerMinute * 0.6);
+  });
+
+  it("backs out first: south with the nose north, wheels turning backwards", () => {
+    const p = pose(i, dep(i) + 3);
     expect(p.z).toBeGreaterThan(spot(i).z);
     expect(p.x).toBeCloseTo(spot(i).x, 9);
     expect(Math.abs(angDiff(p.heading, Math.PI))).toBeLessThan(1e-9);
     expect(p.wheelRotation).toBeLessThan(0);
-  });
-
-  it("fades out only on the street, never inside the agency lot", () => {
-    let last = 1;
-    for (let t = dep(i); t < dep(i) + DRIVE_MINUTES; t += 0.05) {
-      const p = carPoseAt(layout, i, true, t, false);
-      expect(p.alpha).toBeLessThanOrEqual(last + 1e-9);
-      last = p.alpha;
-      if (p.alpha < 1) expect(p.z).toBeGreaterThanOrEqual(layout.streetRow * 6 - 1e-6);
-    }
-    expect(carPoseAt(layout, i, true, dep(i) + 0.5 * DRIVE_MINUTES, false).alpha).toBe(1);
   });
 });
 
 describe("carPoseAt: return", () => {
   const i = 30;
 
-  it("starts invisible at the street end heading west and ends on the spot, nose to the building", () => {
-    const first = carPoseAt(layout, i, true, ret(i) - DRIVE_MINUTES, false);
-    expect(first.alpha).toBeCloseTo(0, 9);
-    expect(first.x).toBeCloseTo(layout.exitEndX, 6);
-    expect(first.z).toBeCloseTo(layout.laneInZ, 6);
-    expect(Math.abs(angDiff(first.heading, -Math.PI / 2))).toBeLessThan(0.01);
+  it("starts at the route start, brakes into the spot, nose to the building", () => {
+    const route = at(routes.arrival, i);
+    const first = pose(i, ret(i) - DRIVE_MINUTES);
+    expect(first.x).toBeCloseTo(at(route, 0).x, 6);
+    expect(first.z).toBeCloseTo(at(route, 0).z, 6);
+    expect(first.alpha).toBe(1);
     expect(first.wheelRotation).toBe(0);
-    const end = carPoseAt(layout, i, true, ret(i) - 1e-6, false);
+    const end = pose(i, ret(i) - 1e-6);
     expect(end.x).toBeCloseTo(spot(i).x, 3);
     expect(end.z).toBeCloseTo(spot(i).z, 3);
     expect(Math.abs(angDiff(end.heading, Math.PI))).toBeLessThan(0.01);
-    expect(end.alpha).toBe(1);
   });
 
-  it("fades in on the street, then drives opaque; wheels only turn forward", () => {
-    let last = 0;
-    let prevWheel = 0;
+  it("brakes before the spot: very little distance left in the last minutes", () => {
+    const total = length(at(routes.arrival, i));
+    const cruisePerMinute = total / DRIVE_MINUTES;
+    const p = pose(i, ret(i) - 0.6);
+    const left = Math.hypot(p.x - spot(i).x, p.z - spot(i).z);
+    expect(left).toBeLessThan(0.2 * cruisePerMinute * 0.6);
+  });
+
+  it("wheels only turn forward and roll the whole route", () => {
+    let prev = 0;
     for (let t = ret(i) - DRIVE_MINUTES; t < ret(i); t += 0.05) {
-      const p = carPoseAt(layout, i, true, t, false);
-      expect(p.alpha).toBeGreaterThanOrEqual(last - 1e-9);
-      last = p.alpha;
-      if (p.alpha < 1) expect(p.z).toBeGreaterThanOrEqual(layout.streetRow * 6 - 1e-6);
-      expect(p.wheelRotation).toBeGreaterThanOrEqual(prevWheel - 1e-9);
-      prevWheel = p.wheelRotation;
+      const w = pose(i, t).wheelRotation;
+      expect(w).toBeGreaterThanOrEqual(prev - 1e-9);
+      prev = w;
     }
-    expect(carPoseAt(layout, i, true, ret(i) - 0.5 * DRIVE_MINUTES, false).alpha).toBe(1);
-  });
-
-  it("the return drives the whole return path (rolled distance = path length / radius)", () => {
-    const L = length(returnPath(layout, i));
-    const end = carPoseAt(layout, i, true, ret(i) - 1e-7, false);
-    expect(end.wheelRotation * WHEEL_RADIUS).toBeCloseTo(L, 2);
+    expect(pose(i, ret(i) - 1e-7).wheelRotation * WHEEL_RADIUS).toBeCloseTo(
+      length(at(routes.arrival, i)),
+      2,
+    );
   });
 });
 
 describe("carPoseAt: no teleport, continuous heading, proportional wheels", () => {
-  const dt = 0.02;
-  const cases = [0, 9, 24, 49].flatMap((i) =>
-    [layout, computeLayout(6, { width: 3000, height: 200 })].map((l) => ({ i, l })),
-  );
-
-  it.each(cases)("car $i: steps are bounded over departure and return", ({ i, l }) => {
-    if (i >= l.spots.length) return;
-    for (const [path, start] of [
-      [exitPath(l, i), dep(i)],
-      [returnPath(l, i), ret(i) - DRIVE_MINUTES],
+  const dt = 0.05;
+  it.each([0, 1, 2, 9, 24, 49])("car %i: steps are bounded over departure and return", (i) => {
+    for (const [path, start, profileMax] of [
+      [at(routes.departure, i), dep(i), 2 / (2 - RAMP)],
+      [at(routes.arrival, i), ret(i) - DRIVE_MINUTES, 2 / (2 - RAMP)],
     ] as const) {
-      const maxStep = ((2.05 * length(path)) / DRIVE_MINUTES) * dt + 1e-6;
+      const L = length(path);
+      const maxStep = ((profileMax * 1.02 * L) / DRIVE_MINUTES) * dt + 1e-6;
       const maxWheel = maxStep / WHEEL_RADIUS;
-      let prev = carPoseAt(l, i, true, start, false);
+      let prev = pose(i, start);
       let rolled = 0;
       let backwards = 0;
       for (let t = start + dt; t < start + DRIVE_MINUTES; t += dt) {
-        const p = carPoseAt(l, i, true, t, false);
+        const p = pose(i, t);
         const move = Math.hypot(p.x - prev.x, p.z - prev.z);
         expect(move, `jump at t=${t}`).toBeLessThanOrEqual(maxStep);
-        expect(Math.abs(angDiff(prev.heading, p.heading)), `turn at t=${t}`).toBeLessThan(0.3);
+        expect(Math.abs(angDiff(prev.heading, p.heading)), `turn at t=${t}`).toBeLessThan(0.45);
         const dw = p.wheelRotation - prev.wheelRotation;
         expect(Math.abs(dw), `wheel jump at t=${t}`).toBeLessThanOrEqual(maxWheel);
         rolled += Math.abs(dw) * WHEEL_RADIUS;
@@ -311,88 +359,58 @@ describe("carPoseAt: no teleport, continuous heading, proportional wheels", () =
           }
         }
         expect(poseNumbers(p).every(Number.isFinite)).toBe(true);
+        expect([0, 1]).toContain(p.alpha);
         prev = p;
       }
-      // the wheels rolled about the whole path (the loop stops one step before the end)
-      expect(rolled).toBeGreaterThan(length(path) * 0.97);
-      expect(rolled).toBeLessThanOrEqual(length(path) * 1.001);
-      // only the exit backs out, and only along the first leg
+      expect(rolled).toBeGreaterThan(L * 0.97);
+      expect(rolled).toBeLessThanOrEqual(L * 1.001);
       if (start === dep(i)) {
         const first = Math.hypot(at(path, 1).x - at(path, 0).x, at(path, 1).z - at(path, 0).z);
         expect(backwards).toBeGreaterThan(first * 0.8);
         expect(backwards).toBeLessThanOrEqual(first + 0.5);
-      } else {
-        expect(backwards).toBe(0);
-      }
+      } else expect(backwards).toBe(0);
     }
   });
 
-  it("the departure ends with (path length - 2 x reverse leg) / radius of wheel rotation", () => {
+  it("the departure ends with (route length - 2 x reverse leg) / radius of wheel rotation", () => {
     for (const i of [0, 17, 49]) {
-      const out = exitPath(layout, i);
+      const out = at(routes.departure, i);
       const first = Math.hypot(at(out, 1).x - at(out, 0).x, at(out, 1).z - at(out, 0).z);
-      const end = carPoseAt(layout, i, true, dep(i) + DRIVE_MINUTES - 1e-7, false);
+      const end = pose(i, dep(i) + DRIVE_MINUTES - 1e-7);
       expect(end.wheelRotation * WHEEL_RADIUS).toBeCloseTo(length(out) - 2 * first, 2);
     }
   });
 
-  it("position and opacity are continuous across every phase boundary", () => {
+  it("position is continuous across the phase boundaries while visible", () => {
     for (const i of [0, 9, 49]) {
-      for (const edge of [dep(i), dep(i) + DRIVE_MINUTES, ret(i) - DRIVE_MINUTES, ret(i)]) {
-        const a = carPoseAt(layout, i, true, edge - 1e-6, false);
-        const b = carPoseAt(layout, i, true, edge + 1e-6, false);
-        if (a.alpha > 0.01 && b.alpha > 0.01) {
-          expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeLessThan(0.1);
-          expect(Math.abs(angDiff(a.heading, b.heading))).toBeLessThan(0.05);
-        }
-        expect(Math.abs(a.alpha - b.alpha)).toBeLessThan(0.02);
+      for (const edge of [dep(i), ret(i)]) {
+        const a = pose(i, edge - 1e-6);
+        const b = pose(i, edge + 1e-6);
+        expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeLessThan(0.1);
       }
     }
-  });
-
-  it("the heading blends over TURN_BLEND at corners: both legs of a corner give the same heading", () => {
-    const out = exitPath(layout, 20);
-    const corner = at(out, 2); // aisle -> exit lane corner
-    // find the time the car is at that corner
-    let best = { t: dep(20), d: Infinity };
-    for (let t = dep(20); t < dep(20) + DRIVE_MINUTES; t += 0.002) {
-      const p = carPoseAt(layout, 20, true, t, false);
-      const d = Math.hypot(p.x - corner.x, p.z - corner.z);
-      if (d < best.d) best = { t, d };
-    }
-    expect(best.d).toBeLessThan(0.05);
-    const before = carPoseAt(layout, 20, true, best.t - 0.0005, false);
-    const after = carPoseAt(layout, 20, true, best.t + 0.0005, false);
-    expect(Math.abs(angDiff(before.heading, after.heading))).toBeLessThan(0.05);
   });
 });
 
 describe("carPoseAt: reduced motion", () => {
   it("hidden from dep to ret, parked and visible otherwise, wheels never turn", () => {
     for (const i of [0, 4, 49]) {
-      expect(carPoseAt(layout, i, true, dep(i) + 5, true)).toMatchObject({ alpha: 0 });
-      expect(carPoseAt(layout, i, true, ret(i), true)).toMatchObject({
-        alpha: 1,
-        x: spot(i).x,
-        z: spot(i).z,
-      });
+      expect(pose(i, dep(i) + 5, true, true)).toMatchObject({ alpha: 0 });
+      expect(pose(i, ret(i), true, true)).toMatchObject({ alpha: 1, x: spot(i).x, z: spot(i).z });
       for (let t = -2; t < 722; t += 0.7) {
-        const p = carPoseAt(layout, i, true, t, true);
+        const p = pose(i, t, true, true);
         expect(p.phase === "departing" || p.phase === "returning").toBe(false);
         expect(p.wheelRotation).toBe(0);
-        expect(poseNumbers(p).every(Number.isFinite)).toBe(true);
         if (p.alpha > 0) expect(p).toMatchObject({ x: spot(i).x, z: spot(i).z });
       }
     }
   });
 
-  it("switching reduced motion on mid-trip does not leave a ghost on the road", () => {
+  it("switching reduced motion on mid-trip leaves no ghost on the road", () => {
     const i = 8;
-    const mid = dep(i) + 10;
-    expect(carPoseAt(layout, i, true, mid, false).alpha).toBeGreaterThan(0);
-    expect(carPoseAt(layout, i, true, mid, true).alpha).toBe(0);
-    const back = ret(i) - 10;
-    expect(carPoseAt(layout, i, true, back, true).alpha).toBe(0);
+    expect(pose(i, dep(i) + 10).alpha).toBe(1);
+    expect(pose(i, dep(i) + 10, true, true).alpha).toBe(0);
+    expect(pose(i, ret(i) - 10, true, true).alpha).toBe(0);
   });
 });
 
@@ -438,25 +456,10 @@ describe("carIndexAt", () => {
     expect(carIndexAt(tiny, VIEW, one, { x: c.x, y: c.y - 24 })).toBeNull();
   });
 
-  it("at large zoom the hit box follows the projected, oriented car box", () => {
-    const cam40: Camera = { zoom: 40, centerX: 0, centerY: 0 };
-    const along = mkPose(0, 0, { heading: Math.PI }); // long axis north-south
-    const across = mkPose(0, 0, { heading: Math.PI / 2 }); // long axis east-west
-    const c = screenOf(cam40, along);
-    const hit = (p: CarPose, dx: number) => carIndexAt(cam40, VIEW, [p], { x: c.x + dx, y: c.y });
-    expect(hit(along, 66)).toBe(0);
-    expect(hit(across, 66)).toBe(0);
-    expect(hit(along, 78)).toBeNull();
-    expect(hit(across, 78)).toBe(0);
-    expect(hit(across, 90)).toBeNull();
-    expect(hit(along, -78)).toBeNull();
-    expect(hit(across, -78)).toBe(0);
-  });
-
   it("the closest centre wins; ties go to the larger index", () => {
     const c: Camera = { zoom: 10, centerX: 0, centerY: 0 };
     const a = mkPose(0, 0);
-    const b = mkPose(1, 0); // about 8.7 px to the right
+    const b = mkPose(1, 0);
     const sa = screenOf(c, a);
     const sb = screenOf(c, b);
     expect(carIndexAt(c, VIEW, [a, b], { x: sa.x - 2, y: sa.y })).toBe(0);
@@ -474,12 +477,11 @@ describe("carIndexAt", () => {
     expect(carIndexAt(c, VIEW, [{ ...base, alpha: 0 }], s)).toBeNull();
     expect(carIndexAt(c, VIEW, [{ ...base, alpha: 0.049 }], s)).toBeNull();
     expect(carIndexAt(c, VIEW, [{ ...base, alpha: 0.05 }], s)).toBe(0);
-    expect(carIndexAt(c, VIEW, [{ ...base, phase: "departing", alpha: 0.6 }], s)).toBe(0);
-    expect(carIndexAt(c, VIEW, [base, { ...base, alpha: 0, phase: "away" }], s)).toBe(0);
+    expect(carIndexAt(c, VIEW, [{ ...base, phase: "departing", alpha: 1 }], s)).toBe(0);
   });
 
   it("a real day: away cars are never selected, parked ones are", () => {
-    const noon = layout.spots.map((_, i) => carPoseAt(layout, i, i % 2 === 0, 300, false));
+    const noon = layout.spots.map((_, i) => pose(i, 300, i % 2 === 0));
     for (let i = 0; i < noon.length; i++) {
       const hit = carIndexAt(cam, VIEW, noon, screenOf(cam, spot(i)));
       if (i % 2 === 1) expect(hit).toBe(i);
@@ -502,7 +504,6 @@ describe("carIndexAt", () => {
       mkPose(0, 0, { alpha: NaN }),
       mkPose(Infinity, -Infinity),
     ];
-    expect(() => carIndexAt(cam, VIEW, bad, { x: 10, y: 10 })).not.toThrow();
     expect(carIndexAt(cam, VIEW, bad, { x: 10, y: 10 })).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import type { Camera, ScreenRect } from "./camera";
+import { planeToScreen, type Camera, type ScreenRect } from "./camera";
 import type { GroundPoint, Rect, Vec } from "./layout";
 
 /**
@@ -9,7 +9,9 @@ import type { GroundPoint, Rect, Vec } from "./layout";
 export const CAMERA_AZIMUTH = Math.PI / 6;
 export const CAMERA_ELEVATION = Math.PI / 4;
 export const CAMERA_DISTANCE = 200;
-export const SHADOW_MARGIN = 10;
+export const SHADOW_MARGIN = 6;
+/** Height of the tallest surface that receives a shadow, for the shadow frustum. */
+export const RECEIVER_HEIGHT = 12;
 
 export interface Point3 {
   readonly x: number;
@@ -103,36 +105,110 @@ export function cameraRig(cam: Camera, view: ScreenRect): CameraRig {
   return { position, target, up: U, left: -halfW, right: halfW, top: halfH, bottom: -halfH };
 }
 
-/** Square ground area covering the visible region (plus margin) for the shadow camera. */
+const DEFAULT_SUN: Point3 = { x: 0.3, y: 0.8, z: 0.52 };
+
+function unit(v: Point3): Point3 | null {
+  if (!ok(v.x) || !ok(v.y) || !ok(v.z)) return null;
+  const len = Math.hypot(v.x, v.y, v.z);
+  return len > 1e-9 ? { x: v.x / len, y: v.y / len, z: v.z / len } : null;
+}
+
+/**
+ * Orthonormal basis of the light's view (three's lookAt convention, camera at the sun):
+ * right = normalize(Y x sunDir), up = sunDir x right. A vertical or invalid sun falls back safely.
+ */
+export function lightBasis(sunDir: Point3): { readonly right: Point3; readonly up: Point3 } {
+  const s = unit(sunDir) ?? (unit(DEFAULT_SUN) as Point3);
+  let right = unit({ x: s.z, y: 0, z: -s.x });
+  if (!right) right = { x: 1, y: 0, z: 0 };
+  const up: Point3 = {
+    x: s.y * right.z - s.z * right.y,
+    y: s.z * right.x - s.x * right.z,
+    z: s.x * right.y - s.y * right.x,
+  };
+  return { right, up };
+}
+
+/**
+ * Rectangle of the shadow camera in the light's axes covering what the screen shows: the 4 screen
+ * corners projected to the ground (y = 0) and to y = RECEIVER_HEIGHT, plus SHADOW_MARGIN. `center`
+ * is the rectangle centre moved along `sunDir` down to the ground.
+ */
 export function shadowFrustum(
   cam: Camera,
   view: ScreenRect,
-): { readonly center: GroundPoint; readonly halfExtent: number } {
+  sunDir: Point3,
+): {
+  readonly center: GroundPoint;
+  readonly halfWidth: number;
+  readonly halfHeight: number;
+  readonly up: Point3;
+} {
+  const s = unit(sunDir) ?? (unit(DEFAULT_SUN) as Point3);
+  const { right, up } = lightBasis(s);
   const zoom = safeZoom(cam);
   const w = safeSize(view.width);
   const h = safeSize(view.height);
   const cx = ok(cam.centerX) ? cam.centerX : 0;
   const cy = ok(cam.centerY) ? cam.centerY : 0;
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minZ = Infinity;
-  let maxZ = -Infinity;
+  let minR = Infinity;
+  let maxR = -Infinity;
+  let minU = Infinity;
+  let maxU = -Infinity;
   for (const sx of [-1, 1]) {
     for (const sy of [-1, 1]) {
-      const g = viewPlaneToGround({ x: cx + (sx * w) / 2 / zoom, y: cy + (sy * h) / 2 / zoom });
-      if (!g) continue;
-      minX = Math.min(minX, g.x);
-      maxX = Math.max(maxX, g.x);
-      minZ = Math.min(minZ, g.z);
-      maxZ = Math.max(maxZ, g.z);
+      for (const y of [0, RECEIVER_HEIGHT]) {
+        const g = viewPlaneToGround(
+          { x: cx + (sx * w) / 2 / zoom, y: cy + (sy * h) / 2 / zoom },
+          y,
+        );
+        if (!g) continue;
+        const p: Point3 = { x: g.x, y, z: g.z };
+        const r = dot(p, right);
+        const u = dot(p, up);
+        minR = Math.min(minR, r);
+        maxR = Math.max(maxR, r);
+        minU = Math.min(minU, u);
+        maxU = Math.max(maxU, u);
+      }
     }
   }
-  if (![minX, maxX, minZ, maxZ].every(ok)) {
-    return { center: { x: 0, z: 0 }, halfExtent: SHADOW_MARGIN };
+  if (![minR, maxR, minU, maxU].every(ok)) {
+    return { center: { x: 0, z: 0 }, halfWidth: SHADOW_MARGIN, halfHeight: SHADOW_MARGIN, up };
   }
-  const half = Math.max(maxX - minX, maxZ - minZ) / 2 + SHADOW_MARGIN;
+  const cr = (minR + maxR) / 2;
+  const cu = (minU + maxU) / 2;
+  const px = right.x * cr + up.x * cu;
+  const py = right.y * cr + up.y * cu;
+  const pz = right.z * cr + up.z * cu;
+  const along = s.y > 1e-6 ? -py / s.y : 0;
+  const center = { x: px + s.x * along, z: pz + s.z * along };
+  const halfWidth = (maxR - minR) / 2 + SHADOW_MARGIN;
+  const halfHeight = (maxU - minU) / 2 + SHADOW_MARGIN;
   return {
-    center: { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 },
-    halfExtent: ok(half) && half > 0 ? half : SHADOW_MARGIN,
+    center: ok(center.x) && ok(center.z) ? center : { x: 0, z: 0 },
+    halfWidth: ok(halfWidth) && halfWidth > 0 ? halfWidth : SHADOW_MARGIN,
+    halfHeight: ok(halfHeight) && halfHeight > 0 ? halfHeight : SHADOW_MARGIN,
+    up,
   };
+}
+
+/** True if the 3D point projects inside the view rectangle grown by `marginPx` on every side. */
+export function groundPointOnScreen(
+  cam: Camera,
+  view: ScreenRect,
+  p: Point3,
+  marginPx: number,
+): boolean {
+  if (!ok(p.x) || !ok(p.y) || !ok(p.z) || !ok(cam.zoom) || cam.zoom <= 0) return false;
+  const m = ok(marginPx) ? Math.max(0, marginPx) : 0;
+  const s = planeToScreen(cam, view, toViewPlane(p));
+  return (
+    ok(s.x) &&
+    ok(s.y) &&
+    s.x >= view.x - m &&
+    s.x <= view.x + view.width + m &&
+    s.y >= view.y - m &&
+    s.y <= view.y + view.height + m
+  );
 }

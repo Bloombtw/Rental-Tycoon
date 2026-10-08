@@ -6,8 +6,11 @@ import {
   ASSET_TURN_OFFSET,
   CAR_ASSET,
   KIT_SCALE,
+  LAMP_HEAD,
+  LOW_BUILDING_SCALE,
   PROP_ASSETS,
   ROAD_TILE_ASSET,
+  TRAFFIC_ASSET,
   assetUrl,
   carAssetKey,
   requiredAssets,
@@ -91,9 +94,31 @@ describe("asset tables", () => {
     expect(ROAD_TILE_ASSET).toEqual({
       straight: { kit: "roads", name: "road-straight" },
       crossroad: { kit: "roads", name: "road-crossroad" },
+      crossing: { kit: "roads", name: "road-crossing" },
       driveway: { kit: "roads", name: "road-driveway-single" },
       sidewalk: { kit: "roads", name: "tile-low" },
+      asphalt: { kit: "roads", name: "road-square" },
     });
+  });
+
+  it("buildings: 13 models, building-h reserved for the agency", () => {
+    const b = PROP_ASSETS.building.map((r) => r.name);
+    expect(b).toHaveLength(13);
+    expect(b).not.toContain("building-h");
+    expect(new Set(b).size).toBe(13);
+    expect(PROP_ASSETS.agency.map((r) => r.name)).toEqual(["building-h"]);
+  });
+
+  it("traffic models map to cars/{name} and never to a player car", () => {
+    expect(Object.keys(TRAFFIC_ASSET).sort()).toEqual(
+      ["ambulance", "delivery", "garbage-truck", "police", "suv", "taxi", "truck", "van"].sort(),
+    );
+    const player = new Set(Object.values(CAR_ASSET).map((r) => r.name));
+    for (const [model, r] of Object.entries(TRAFFIC_ASSET)) {
+      expect(r).toEqual({ kit: "cars", name: model });
+      expect(player.has(r.name), `${model} uses a player asset`).toBe(false);
+    }
+    expect(LOW_BUILDING_SCALE).toBe(4.2);
   });
 
   it("props list the spec models and cover every prop kind", () => {
@@ -105,7 +130,7 @@ describe("asset tables", () => {
     expect(PROP_ASSETS.building).toEqual(
       n(
         "city",
-        letters("a", "f").map((c) => `building-${c}`),
+        [...letters("a", "g"), ...letters("i", "n")].map((c) => `building-${c}`),
       ),
     );
     expect(PROP_ASSETS.backdrop).toEqual(
@@ -115,14 +140,44 @@ describe("asset tables", () => {
       ),
     );
     expect(PROP_ASSETS.lowBuilding).toEqual(
-      n(
-        "city",
-        letters("a", "n").map((c) => `low-detail-building-${c}`),
-      ),
+      n("city", [
+        ...letters("a", "n").map((c) => `low-detail-building-${c}`),
+        "low-detail-building-wide-a",
+        "low-detail-building-wide-b",
+      ]),
     );
     expect(PROP_ASSETS.lamp.map((r) => r.name)).toEqual(["light-square"]);
+    expect(PROP_ASSETS.streetLamp.map((r) => r.name)).toEqual(["light-curved"]);
+    expect(PROP_ASSETS.trafficLight.map((r) => r.name)).toEqual(["traffic-light"]);
+    expect(PROP_ASSETS.streetSign.map((r) => r.name)).toHaveLength(1);
+    expect(PROP_ASSETS.streetSign[0]?.name).toMatch(/^road-sign-(object-)?street$/);
+    expect(PROP_ASSETS.construction.map((r) => r.name)).toEqual([
+      "construction-fence",
+      "construction-barrier",
+      "construction-cone",
+      "construction-light",
+    ]);
+    expect(PROP_ASSETS.dumpster.map((r) => r.name)).toEqual(["dumpster"]);
+    expect(PROP_ASSETS.tree).toEqual([]);
+    expect(PROP_ASSETS.parkedCar).toEqual([]);
     expect(Object.keys(PROP_ASSETS).sort()).toEqual(
-      ["agency", "awning", "sign", "parasol", "building", "backdrop", "lowBuilding", "lamp"].sort(),
+      [
+        "agency",
+        "awning",
+        "sign",
+        "parasol",
+        "building",
+        "backdrop",
+        "lowBuilding",
+        "lamp",
+        "streetLamp",
+        "trafficLight",
+        "streetSign",
+        "construction",
+        "dumpster",
+        "tree",
+        "parkedCar",
+      ].sort(),
     );
   });
 
@@ -194,10 +249,11 @@ describe("requiredAssets", () => {
     const expected = new Set<string>();
     const add = (r: AssetRef) => expected.add(`${r.kit}/${r.name}`);
     Object.values(CAR_ASSET).forEach(add);
+    Object.values(TRAFFIC_ASSET).forEach(add);
     Object.values(ROAD_TILE_ASSET).forEach(add);
     Object.values(PROP_ASSETS).forEach((l) => l.forEach(add));
     expect(new Set(list.map((r) => `${r.kit}/${r.name}`))).toEqual(expected);
-    expect(list.length).toBe(37);
+    expect(list.length).toBe(expected.size);
   });
 
   it("uses only the known kits, with a scale for each", () => {
@@ -254,4 +310,56 @@ describe("car models expose what the renderer relies on (spec 8.3)", () => {
       expect(bodyMeshes.length, `${CAR_ASSET[key].name} has no body mesh`).toBeGreaterThan(0);
     },
   );
+
+  it.each(Object.entries(TRAFFIC_ASSET))(
+    "traffic model %s has named wheels (they are instanced and spun) and a body mesh",
+    (_model, r) => {
+      const g = gltf(r);
+      const names = (g.nodes ?? []).map((n) => n.name ?? "");
+      expect(names.filter((n) => n.startsWith("wheel")).length, r.name).toBeGreaterThanOrEqual(4);
+      expect(
+        (g.nodes ?? []).filter((n) => n.mesh !== undefined && !(n.name ?? "").startsWith("wheel"))
+          .length,
+        r.name,
+      ).toBeGreaterThan(0);
+    },
+  );
+});
+
+describe("LAMP_HEAD is measured on the model", () => {
+  interface Gltf {
+    accessors?: { min?: number[]; max?: number[] }[];
+    meshes?: { primitives: { attributes: { POSITION?: number } }[] }[];
+  }
+  function bounds(r: AssetRef): { min: number[]; max: number[] } {
+    const bytes = readFileSync(file(r));
+    const g = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString("utf8")) as Gltf;
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (const m of g.meshes ?? []) {
+      for (const p of m.primitives) {
+        const a = g.accessors?.[p.attributes.POSITION ?? -1];
+        for (let i = 0; i < 3; i++) {
+          min[i] = Math.min(min[i] ?? 0, a?.min?.[i] ?? Infinity);
+          max[i] = Math.max(max[i] ?? 0, a?.max?.[i] ?? -Infinity);
+        }
+      }
+    }
+    return { min, max };
+  }
+
+  it("covers light-square and light-curved only, finite, near the top of the model", () => {
+    expect(Object.keys(LAMP_HEAD).sort()).toEqual(["light-curved", "light-square"]);
+    for (const [name, head] of Object.entries(LAMP_HEAD)) {
+      const b = bounds({ kit: "roads", name });
+      const [x, y, z] = [head.x, head.y, head.z];
+      expect([x, y, z].every(Number.isFinite), name).toBe(true);
+      expect(y, `${name} head height`).toBeGreaterThan(0.75 * (b.max[1] ?? 0));
+      expect(y, `${name} head height`).toBeLessThanOrEqual((b.max[1] ?? 0) + 0.05);
+      expect(x).toBeGreaterThanOrEqual((b.min[0] ?? 0) - 0.05);
+      expect(x).toBeLessThanOrEqual((b.max[0] ?? 0) + 0.05);
+      expect(z).toBeGreaterThanOrEqual((b.min[2] ?? 0) - 0.05);
+      expect(z).toBeLessThanOrEqual((b.max[2] ?? 0) + 0.05);
+    }
+  });
 });

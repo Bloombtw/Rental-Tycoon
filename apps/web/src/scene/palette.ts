@@ -1,4 +1,5 @@
 import { carAssetKey, type CarAssetKey } from "./assets";
+import type { LightKey } from "./lighting";
 
 /**
  * Scene colours. Read from the CSS tokens in styles/tokens.css; FALLBACK_PALETTE is used when a
@@ -32,18 +33,40 @@ export const FALLBACK_PALETTE: Palette = Object.freeze({
   signText: 0xffffff,
 });
 
-/** Purely 3D colours (light and sky), not tied to a CSS token. */
-export const SCENE_COLORS: Readonly<{
-  sky: number;
-  sun: number;
-  hemiSky: number;
-  hemiGround: number;
-}> = Object.freeze({
-  sky: 0xbfe3f2,
-  sun: 0xfff1d6,
-  hemiSky: 0xcfe8ff,
-  hemiGround: 0x9bb07a,
+/** Sky, sun and hemisphere colours of each light keyframe (spec 2.4). */
+export const LIGHT_COLORS: Readonly<
+  Record<LightKey, { sky: number; sun: number; hemiSky: number; hemiGround: number }>
+> = Object.freeze({
+  morning: { sky: 0xcde9f6, sun: 0xfff4e2, hemiSky: 0xd8eeff, hemiGround: 0x9bb07a },
+  noon: { sky: 0xb4e0f4, sun: 0xfff6e8, hemiSky: 0xcfe8ff, hemiGround: 0x9bb07a },
+  afternoon: { sky: 0xbfe3f2, sun: 0xfff1d6, hemiSky: 0xcfe8ff, hemiGround: 0x9bb07a },
+  golden: { sky: 0xf5dcb4, sun: 0xffd59e, hemiSky: 0xf3dcc0, hemiGround: 0x9a9f6e },
+  sunset: { sky: 0xf6b48a, sun: 0xffa463, hemiSky: 0xf0c0a0, hemiGround: 0x8a7f62 },
+  // Evening hemisphere colours lifted from the spec's starting values: at 20:30 the scene had to
+  // stay readable on a phone screen (visual pass, city-life phase B).
+  dusk: { sky: 0xd98a7a, sun: 0xff8550, hemiSky: 0xc9aac8, hemiGround: 0x7a706b },
+  late: { sky: 0x7a6a9c, sun: 0xff7a48, hemiSky: 0xa8a0d4, hemiGround: 0x6a6c8c },
 });
+
+/** Purely 3D colours, not tied to a CSS token. */
+export const SCENE_COLORS: Readonly<{
+  lampGlow: number;
+  headlight: number;
+  taillight: number;
+  treeLeaves: readonly number[];
+  treeTrunk: number;
+  constructionGround: number;
+}> = Object.freeze({
+  lampGlow: 0xffd58a,
+  headlight: 0xfff2c8,
+  taillight: 0xff4a3d,
+  treeLeaves: Object.freeze([0x6fbf73, 0x4f9d69, 0x8cc084]),
+  treeTrunk: 0x8a5a3b,
+  constructionGround: 0xc9a77c,
+});
+
+/** Tints of the distant low-detail buildings (brick, sand, cream...). */
+export const FAR_TINTS: readonly number[] = Object.freeze([0xd9a07a, 0xc9b79c, 0xe3c9a0, 0xb98b73]);
 
 /** Body tints per model, picked by car id. Every list is non-empty. */
 export const CAR_TINTS: Readonly<Record<CarAssetKey, readonly number[]>> = Object.freeze({

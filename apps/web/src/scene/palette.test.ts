@@ -3,6 +3,7 @@ import * as paletteModule from "./palette";
 import {
   CAR_TINTS,
   FALLBACK_PALETTE,
+  FAR_TINTS,
   PALETTE_TOKENS,
   SCENE_COLORS,
   carTint,
@@ -167,9 +168,32 @@ describe("readPalette", () => {
 });
 
 describe("SCENE_COLORS", () => {
-  it("has the four 3D-only colours, all valid", () => {
-    expect(Object.keys(SCENE_COLORS).sort()).toEqual(["hemiGround", "hemiSky", "sky", "sun"]);
-    for (const c of Object.values(SCENE_COLORS)) expect(isColor(c)).toBe(true);
+  it("has the city-life 3D-only colours, all valid; sky and sun moved to LIGHT_COLORS", () => {
+    expect(Object.keys(SCENE_COLORS).sort()).toEqual(
+      [
+        "constructionGround",
+        "headlight",
+        "lampGlow",
+        "taillight",
+        "treeLeaves",
+        "treeTrunk",
+      ].sort(),
+    );
+    for (const gone of ["sky", "sun", "hemiSky", "hemiGround"])
+      expect(gone in SCENE_COLORS).toBe(false);
+    for (const [k, c] of Object.entries(SCENE_COLORS)) {
+      if (Array.isArray(c)) {
+        expect(c.length, k).toBeGreaterThanOrEqual(3);
+        for (const v of c) expect(isColor(v), k).toBe(true);
+      } else expect(isColor(c), k).toBe(true);
+    }
+  });
+
+  it("FAR_TINTS are warm, valid and not all the same", () => {
+    expect(FAR_TINTS.length).toBeGreaterThanOrEqual(3);
+    for (const c of FAR_TINTS) expect(isColor(c)).toBe(true);
+    expect(new Set(FAR_TINTS).size).toBe(FAR_TINTS.length);
+    for (const c of FAR_TINTS) expect((c >> 16) & 255).toBeGreaterThan(c & 255); // red above blue
   });
 });
 

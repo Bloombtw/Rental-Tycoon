@@ -49,7 +49,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
   1. Garder et terminer la partie **sim** (`time.ts`, journée d'ouverture, encaissement en direct) et la partie **horloge / vitesses / HUD** côté web : elles ne dépendent pas du moteur de rendu.
   2. Réviser la spec (`agency-view.md`, nouvelle révision) : la vue PixiJS 2D est remplacée par la **scène 3D Three.js** décrite ci-dessus ; les comportements de la spec (pastilles, sélection, gestes, caméra, bannière nouveau jour, démarrage en pause) restent valables.
   3. Remplacer `apps/web/src/scene/` (PixiJS) par la scène Three.js. Pas de double moteur à la fin de la feature.
-- ⬜ **Ville et vie 3D** (juste après, avant la Phase 1) : quartier complet autour de l'agence, voitures qui circulent sur les routes, cycle de lumière 09:00–21:00 avec ombres, éclairage du soir, circulation de fond — toutes les exigences de la section ⭐ non couvertes par `agency-view`.
+- ✅ **Ville et vie 3D** (`city-life.md`) : quartier complet autour de l'agence, voitures qui circulent sur les routes, cycle de lumière 09:00–21:00 avec ombres, éclairage du soir, circulation de fond — toutes les exigences de la section ⭐ non couvertes par `agency-view`.
 
 ## Phase 1 — Les fondations du genre
 

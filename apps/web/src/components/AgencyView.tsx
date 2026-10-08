@@ -28,6 +28,14 @@ import { computeLayout, type AgencyLayout } from "../scene/layout.js";
 import { carTooltip } from "../scene/tooltip.js";
 import { detectWebGL } from "../scene/webgl.js";
 import { readPalette } from "../scene/palette.js";
+import {
+  INITIAL_MONITOR,
+  initialTier,
+  observeFrame,
+  type FrameMonitor,
+  type QualityTier,
+} from "../scene/quality.js";
+import { advanceAmbient } from "../scene/traffic.js";
 import type { AgencyScene3D } from "../scene/AgencyScene3D.js";
 import { CarTooltip } from "./CarTooltip.js";
 
@@ -37,6 +45,8 @@ interface AgencyViewProps {
   /** Committed game state. Changes (buy, price, commit) trigger a redraw while paused. */
   readonly game: GameState;
   readonly paused: boolean;
+  /** Game speed (1, 2, 4 or 10): drives the pace of the background traffic. */
+  readonly speed: number;
   /** Fractional minutes not yet committed, for interpolation. */
   readonly pendingRef: { readonly current: number };
 }
@@ -63,7 +73,24 @@ function reducedMotionQuery(): MediaQueryList | null {
     : null;
 }
 
-export function AgencyView({ game, paused, pendingRef }: AgencyViewProps) {
+/** Diagnostic attributes are refreshed at most this often. */
+const DIAGNOSTIC_INTERVAL_MS = 500;
+
+function deviceHints(): { hardwareConcurrency?: unknown; deviceMemory?: unknown } {
+  if (typeof navigator === "undefined") return {};
+  const nav = navigator as Navigator & { deviceMemory?: unknown };
+  return { hardwareConcurrency: nav.hardwareConcurrency, deviceMemory: nav.deviceMemory };
+}
+
+function loadingText(progress: { loaded: number; total: number }): string {
+  if (!Number.isFinite(progress.loaded) || !Number.isFinite(progress.total))
+    return "Chargement de la ville…";
+  if (!(progress.total > 0)) return "Chargement de la ville…";
+  const pct = Math.min(100, Math.max(0, Math.round((progress.loaded / progress.total) * 100)));
+  return `Chargement de la ville… ${String(pct)} %`;
+}
+
+export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<ViewStatus>(() => (detectWebGL() ? "loading" : "fallback"));
   const resetRef = useRef<(() => void) | null>(null);
@@ -81,10 +108,14 @@ export function AgencyView({ game, paused, pendingRef }: AgencyViewProps) {
   const layoutRef = useRef<{ key: string; layout: AgencyLayout } | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
   const tooltipRef = useRef<TooltipState | null>(null);
+  const speedRef = useRef(speed);
+  const ambientRef = useRef(0);
+  const [progress, setProgress] = useState({ loaded: 0, total: 0 });
 
   useEffect(() => {
     gameRef.current = game;
     pausedRef.current = paused;
+    speedRef.current = speed;
     tooltipRef.current = tooltip;
   });
 
@@ -97,6 +128,10 @@ export function AgencyView({ game, paused, pendingRef }: AgencyViewProps) {
     let observer: ResizeObserver | null = null;
     const motion = reducedMotionQuery();
     let raf: number | null = null;
+    let tier: QualityTier = initialTier(deviceHints());
+    let monitor: FrameMonitor = INITIAL_MONITOR;
+    let lastFrame: number | null = null;
+    let lastDiagnostics = Number.NEGATIVE_INFINITY;
 
     const teardown = (): void => {
       if (raf !== null) cancelAnimationFrame(raf);
@@ -145,17 +180,45 @@ export function AgencyView({ game, paused, pendingRef }: AgencyViewProps) {
             ? fitCamera(layout.bounds, view)
             : clampCamera(cam, layout.bounds, view);
         cameraRef.current = cam;
-        scene.update(preview.game, preview.timeOfDay, layout);
+        scene.update(preview.game, preview.timeOfDay, layout, ambientRef.current);
         scene.setCamera(cam, view);
         scene.render();
         host.dataset["carSprites"] = String(scene.posesNow().length);
+        host.dataset["quality"] = tier;
+        const now = performance.now();
+        if (now - lastDiagnostics >= DIAGNOSTIC_INTERVAL_MS) {
+          lastDiagnostics = now;
+          const stats = scene.stats();
+          host.dataset["traffic"] = String(stats.traffic);
+          host.dataset["drawCalls"] = String(stats.calls);
+          host.dataset["triangles"] = String(stats.triangles);
+        }
       } catch {
         fail();
       }
     };
 
-    const loop = (): void => {
+    const loop = (now: number): void => {
       raf = null;
+      if (scene && !pausedRef.current) {
+        // Time advances: move the ambient clock and watch the frame time.
+        const dt = lastFrame === null ? 0 : now - lastFrame;
+        lastFrame = now;
+        ambientRef.current = advanceAmbient(ambientRef.current, dt, speedRef.current, false);
+        if (dt > 0) {
+          const next = observeFrame(monitor, tier, dt, now);
+          monitor = next.monitor;
+          if (next.tier !== tier) {
+            tier = next.tier;
+            try {
+              scene.setQuality(tier);
+            } catch {
+              fail();
+              return;
+            }
+          }
+        }
+      }
       draw();
       if (scene && !pausedRef.current) raf = requestAnimationFrame(loop);
     };
@@ -165,8 +228,10 @@ export function AgencyView({ game, paused, pendingRef }: AgencyViewProps) {
       if (pausedRef.current) {
         if (raf !== null) cancelAnimationFrame(raf);
         raf = null;
+        lastFrame = null;
         draw();
       } else if (raf === null) {
+        lastFrame = null;
         raf = requestAnimationFrame(loop);
       }
     };
@@ -255,8 +320,14 @@ export function AgencyView({ game, paused, pendingRef }: AgencyViewProps) {
     const initial = measure();
     setSize(initial);
     import("../scene/AgencyScene3D.js")
-      .then(({ AgencyScene3D: Scene }) =>
-        Scene.create(host, {
+      .then(({ AgencyScene3D: Scene }) => {
+        // The effect may have been cleaned up while the module was loading: build nothing.
+        if (cancelled) return null;
+        return Scene.create(host, {
+          tier,
+          onProgress: (loaded, total) => {
+            if (!cancelled) setProgress({ loaded, total });
+          },
           palette: readPalette((name) =>
             getComputedStyle(document.documentElement).getPropertyValue(name),
           ),
@@ -264,15 +335,18 @@ export function AgencyView({ game, paused, pendingRef }: AgencyViewProps) {
           size: { width: Math.max(1, initial.width), height: Math.max(1, initial.height) },
           baseUrl: import.meta.env.BASE_URL,
           isCancelled: () => cancelled,
-        }),
-      )
+        });
+      })
       .then((created) => {
+        if (created === null) return;
         if (cancelled) {
           created.destroy();
           return;
         }
         scene = created;
         sceneRef.current = created;
+        // The scene may have lowered the tier (small GPU textures): start from the real one.
+        tier = created.quality();
         created.onFailure(fail);
         host.addEventListener("wheel", onWheel, { passive: false });
         motion?.addEventListener("change", onMotionChange);
@@ -366,7 +440,7 @@ export function AgencyView({ game, paused, pendingRef }: AgencyViewProps) {
     >
       {status === "loading" && (
         <div className="agency-loading" data-testid="agency-loading" role="status">
-          Chargement de la ville…
+          {loadingText(progress)}
         </div>
       )}
       {status === "fallback" && <AgencyFallback />}

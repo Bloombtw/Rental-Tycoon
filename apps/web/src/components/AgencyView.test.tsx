@@ -12,7 +12,8 @@ import type { AgencyLayout } from "../scene/layout.js";
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 interface FakeInstance {
-  updates: { game: GameState; timeOfDay: number; layout: AgencyLayout }[];
+  updates: { game: GameState; timeOfDay: number; layout: AgencyLayout; ambient: number }[];
+  tiers: string[];
   cameras: { cam: Camera; view: ScreenRect }[];
   highlights: (number | null)[];
   reduced: boolean[];
@@ -40,6 +41,7 @@ class FakeScene {
   constructor() {
     this.inst = {
       updates: [],
+      tiers: [],
       cameras: [],
       highlights: [],
       reduced: [],
@@ -67,11 +69,22 @@ class FakeScene {
   private touch(): void {
     if (this.inst.destroys > 0) this.inst.afterDestroy++;
   }
-  update(game: GameState, timeOfDay: number, layout: AgencyLayout): void {
+  update(game: GameState, timeOfDay: number, layout: AgencyLayout, ambient: number): void {
     this.touch();
-    this.inst.updates.push({ game, timeOfDay, layout });
+    this.inst.updates.push({ game, timeOfDay, layout, ambient });
     this.layout = layout;
     this.count = game.fleet.length;
+  }
+  quality(): string {
+    return "high";
+  }
+  setQuality(tier: string): void {
+    this.touch();
+    this.inst.tiers.push(tier);
+  }
+  stats(): { calls: number; triangles: number; traffic: number } {
+    this.touch();
+    return { calls: 12, triangles: 3456, traffic: 7 };
   }
   setCamera(cam: Camera, view: ScreenRect): void {
     this.touch();
@@ -87,7 +100,7 @@ class FakeScene {
     const l = this.layout;
     if (!l) return [];
     return Array.from({ length: Math.min(this.count, l.spots.length) }, (_, i) =>
-      carPoseAt(l, i, false, 0, false),
+      carPoseAt(l, { departure: [], arrival: [] }, i, false, 0, false),
     );
   }
   render(): void {
@@ -121,7 +134,7 @@ function render(node: ReactNode): void {
   });
 }
 function view(g: GameState, paused = true) {
-  return <AgencyView game={g} paused={paused} pendingRef={pendingRef} />;
+  return <AgencyView game={g} paused={paused} pendingRef={pendingRef} speed={1} />;
 }
 async function flush(): Promise<void> {
   await act(async () => {
@@ -328,35 +341,68 @@ describe("AgencyView: lifetime", () => {
     root = createRoot(container);
   });
 
-  it("StrictMode double mount: every created scene is destroyed once, the live one stays", async () => {
+  it("StrictMode double mount: create runs once (the cancelled effect builds nothing), destroyed once", async () => {
     render(<StrictMode>{view(game())}</StrictMode>);
     await flush();
-    expect(ctl.pending.length).toBe(2);
+    expect(ctl.pending.length).toBe(1);
     await resolveNext();
-    await resolveNext();
-    expect(ctl.instances).toHaveLength(2);
-    const [first, second] = ctl.instances as [FakeInstance, FakeInstance];
-    expect(first.destroys).toBe(1);
-    expect(first.updates).toHaveLength(0);
-    expect(second.destroys).toBe(0);
+    expect(ctl.instances).toHaveLength(1);
+    const [only] = ctl.instances as [FakeInstance];
+    expect(only.destroys).toBe(0);
     expect(state()).toBe("ready");
     act(() => {
       root.unmount();
     });
-    expect(first.destroys).toBe(1);
-    expect(second.destroys).toBe(1);
+    expect(only.destroys).toBe(1);
+    expect(only.afterDestroy).toBe(0);
     root = createRoot(container);
   });
 
-  it("StrictMode with a rejected first create does not break the second", async () => {
+  it("StrictMode with a rejected create falls back without throwing", async () => {
     render(<StrictMode>{view(game())}</StrictMode>);
     await flush();
     await act(async () => {
-      ctl.pending.shift()?.reject(new Error("cancelled"));
+      ctl.pending.shift()?.reject(new Error("glb 404"));
       await Promise.resolve();
     });
-    await resolveNext();
-    expect(state()).toBe("ready");
+    await flush();
+    expect(state()).toBe("fallback");
+  });
+
+  it("the loading message shows a progressing percentage", async () => {
+    render(view(game()));
+    await flush();
+    const o = ctl.createOptions[0] as { onProgress: (loaded: number, total: number) => void };
+    act(() => {
+      o.onProgress(1, 4);
+    });
+    expect(q("agency-loading")?.textContent).toBe("Chargement de la ville… 25 %");
+    act(() => {
+      o.onProgress(4, 4);
+    });
+    expect(q("agency-loading")?.textContent).toBe("Chargement de la ville… 100 %");
+  });
+
+  it("exposes the diagnostic attributes once ready and passes the ambient time", async () => {
+    render(view(game()));
+    await flush();
+    const inst = await resolveNext();
+    const el = q("agency-view");
+    expect(el?.getAttribute("data-quality")).toMatch(/^(high|medium|low)$/);
+    expect(el?.getAttribute("data-traffic")).toBe("7");
+    expect(el?.getAttribute("data-draw-calls")).toBe("12");
+    expect(el?.getAttribute("data-triangles")).toBe("3456");
+    expect(inst.updates.every((u) => Number.isFinite(u.ambient) && u.ambient >= 0)).toBe(true);
+  });
+
+  it("while paused two renders give the same ambient time", async () => {
+    render(view(game(3), true));
+    await flush();
+    const inst = await resolveNext();
+    render(view(game(4), true));
+    const amb = inst.updates.map((u) => u.ambient);
+    expect(amb.length).toBeGreaterThan(1);
+    expect(new Set(amb).size).toBe(1);
   });
 
   it("repeated mount / unmount cycles leak no scene", async () => {
