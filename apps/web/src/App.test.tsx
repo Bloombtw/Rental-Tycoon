@@ -12,6 +12,7 @@ import {
 import { App } from "./App.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { formatCents } from "./format.js";
+import { memoryStorage } from "./game/fakeStorage.js";
 import { PRICE_FORMAT_ERROR, PRICE_RANGE_ERROR } from "./game/messages.js";
 import { formatCentsForInput } from "./game/parseEuros.js";
 import type { ClockDriver } from "./game/useGameClock.js";
@@ -101,10 +102,16 @@ function mount(node: ReactNode): void {
 
 function mountApp(initialGame?: GameState): void {
   mount(
+    // Isolated storage and a fixed seed: no test touches the real localStorage.
     initialGame ? (
-      <App initialGame={initialGame} clockDriver={driver} />
+      <App
+        initialGame={initialGame}
+        clockDriver={driver}
+        storage={memoryStorage()}
+        newSeed={() => 1}
+      />
     ) : (
-      <App clockDriver={driver} />
+      <App clockDriver={driver} storage={memoryStorage()} newSeed={() => 1} />
     ),
   );
 }
@@ -206,7 +213,7 @@ describe("App: launch", () => {
   it("works under StrictMode (double reducer calls)", () => {
     mount(
       <StrictMode>
-        <App />
+        <App storage={memoryStorage()} newSeed={() => 1} />
       </StrictMode>,
     );
     clickId("buy-compact");
@@ -687,7 +694,7 @@ describe("App: hidden page and unmount", () => {
     root = createRoot(container);
     mount(
       <StrictMode>
-        <App clockDriver={driver} />
+        <App clockDriver={driver} storage={memoryStorage()} newSeed={() => 1} />
       </StrictMode>,
     );
     clickId("speed-10");
@@ -953,7 +960,7 @@ describe("ErrorBoundary", () => {
     } as unknown as GameState;
     mount(
       <ErrorBoundary>
-        <App initialGame={poisoned} />
+        <App initialGame={poisoned} storage={memoryStorage()} />
       </ErrorBoundary>,
     );
     expect(container.innerHTML).not.toBe("");

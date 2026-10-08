@@ -50,10 +50,11 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
   2. Réviser la spec (`agency-view.md`, nouvelle révision) : la vue PixiJS 2D est remplacée par la **scène 3D Three.js** décrite ci-dessus ; les comportements de la spec (pastilles, sélection, gestes, caméra, bannière nouveau jour, démarrage en pause) restent valables.
   3. Remplacer `apps/web/src/scene/` (PixiJS) par la scène Three.js. Pas de double moteur à la fin de la feature.
 - ✅ **Ville et vie 3D** (`city-life.md`) : quartier complet autour de l'agence, voitures qui circulent sur les routes, cycle de lumière 09:00–21:00 avec ombres, éclairage du soir, circulation de fond — toutes les exigences de la section ⭐ non couvertes par `agency-view`.
+- ⬜ **Refonte de l'interface (PRIORITAIRE, juste après la sauvegarde automatique)** : les boutons, panneaux, HUD, tiroir et bannières datent de la version 2D et font tache à côté de la scène 3D. Les remplacer par une UI de tycoon mobile moderne : boutons avec relief, dégradés et état pressé animé, icônes dessinées (SVG) au lieu du texte seul, cartes de modèles avec vignette 3D de la voiture, HUD compact avec compteur de caisse animé, panneaux en verre dépoli/arrondis, micro-animations sur tout ce qui change, typographie affirmée. Tout via `tokens.css` (nouveaux tokens si besoin), cibles ≥ 44 px, safe areas, mouvement réduit respecté. Voir « UI au niveau » dans la section ⭐.
 
 ## Phase 1 — Les fondations du genre
 
-1. ⬜ **Sauvegarde automatique** (`localStorage`, depuis `apps/web`) + `validateGameState` dans le sim, seed aléatoire par partie. Reprise au retour sur l'app. Indispensable : Safari iOS décharge souvent la PWA en arrière-plan.
+1. ✅ **Sauvegarde automatique** (`autosave.md`) (`localStorage`, depuis `apps/web`) + `validateGameState` dans le sim, seed aléatoire par partie. Reprise au retour sur l'app. Indispensable : Safari iOS décharge souvent la PWA en arrière-plan.
 2. ⬜ **Demande client tirée au sort** (via `rng.ts`) : nombre de clients par jour, probabilité d'acceptation décroissante avec le prix. Remplace le seuil fixe `MAX_ACCEPTED_DAILY_PRICE` (aujourd'hui 150 € est toujours optimal : aucune vraie décision). Le badge « Au parking » dit pourquoi (« trop cher », « pas de client »).
 3. ⬜ **Gains hors ligne** : à la réouverture, écran « Pendant ton absence : +X € » avec bouton « Récupérer ». Plafond de durée (ex. 8 h), améliorable plus tard. Calcul via la sim pure (`advance`), simplifié si nécessaire pour rester rapide.
 

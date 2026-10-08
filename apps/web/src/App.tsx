@@ -10,13 +10,51 @@ import { Hud } from "./components/Hud.js";
 import { ManageDrawer } from "./components/ManageDrawer.js";
 import { MessageBanner } from "./components/MessageBanner.js";
 import type { Speed } from "./game/clock.js";
-import { gameReducer, initUiState } from "./game/gameReducer.js";
+import { NewGameButton } from "./components/NewGameButton.js";
+import { NewGameDialog } from "./components/NewGameDialog.js";
+import { SaveWarning } from "./components/SaveWarning.js";
+import { gameReducer } from "./game/gameReducer.js";
+import { loadInitialState } from "./game/persistence.js";
+import { newSeed } from "./game/seed.js";
+import { browserSaveStorage, type SaveStorage } from "./game/saveStorage.js";
+import { useAutosave } from "./game/useAutosave.js";
 import { browserClockDriver, useGameClock, type ClockDriver } from "./game/useGameClock.js";
 
-export function App(props: { initialGame?: GameState; clockDriver?: ClockDriver }) {
-  const [ui, dispatch] = useReducer(gameReducer, props.initialGame, initUiState);
+export function App(props: {
+  initialGame?: GameState;
+  clockDriver?: ClockDriver;
+  storage?: SaveStorage | null;
+  newSeed?: () => number;
+}) {
+  // Storage and the saved game are read once, synchronously, before the first render.
+  const [storage] = useState<SaveStorage | null>(() =>
+    props.storage !== undefined ? props.storage : browserSaveStorage(),
+  );
+  // StrictMode runs this initializer twice in development and keeps one result. That is safe:
+  // the read is idempotent (the first run copies a rejected save to the backup slot and removes
+  // it, the second then sees no save and would start a new game, but its result is discarded
+  // in favour of the first). Only the kept result reaches the reducer and the autosave.
+  const [loaded] = useState(() =>
+    loadInitialState({
+      storage,
+      newSeed: props.newSeed ?? newSeed,
+      ...(props.initialGame ? { initialGame: props.initialGame } : {}),
+    }),
+  );
+  const [ui, dispatch] = useReducer(gameReducer, loaded.ui);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const { game } = ui;
+
+  const autosave = useAutosave({
+    storage,
+    game,
+    speed: ui.speed,
+    paused: ui.paused,
+    initialStatus: loaded.status,
+    pendingBackup: loaded.pendingBackup,
+  });
+  const { flush } = autosave;
 
   // Whole minutes are committed in batches (at most 10 per second). flushSync keeps the
   // committed state and the pending fraction consistent for the scene's next frame.
@@ -36,6 +74,7 @@ export function App(props: { initialGame?: GameState; clockDriver?: ClockDriver 
   useEffect(() => {
     const pause = (): void => {
       dispatch({ type: "pause" });
+      flush();
     };
     const onVisibility = (): void => {
       if (document.visibilityState === "hidden") pause();
@@ -46,7 +85,20 @@ export function App(props: { initialGame?: GameState; clockDriver?: ClockDriver 
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", pause);
     };
+  }, [flush]);
+
+  const makeSeed = props.newSeed ?? newSeed;
+  const onAskNewGame = useCallback(() => {
+    dispatch({ type: "pause" });
+    setConfirmOpen(true);
   }, []);
+  const onCancelNewGame = useCallback(() => {
+    setConfirmOpen(false);
+  }, []);
+  const onConfirmNewGame = useCallback(() => {
+    dispatch({ type: "newGame", seed: makeSeed() });
+    setConfirmOpen(false);
+  }, [makeSeed]);
 
   const onSetSpeed = useCallback((speed: Speed) => {
     dispatch({ type: "setSpeed", speed });
@@ -77,6 +129,11 @@ export function App(props: { initialGame?: GameState; clockDriver?: ClockDriver 
         onSetSpeed={onSetSpeed}
         onTogglePause={onTogglePause}
       />
+      <SaveWarning
+        status={autosave.status}
+        visible={autosave.warningVisible}
+        onDismiss={autosave.dismissWarning}
+      />
       <MessageBanner error={ui.error} notice={ui.notice} onDismiss={onDismissMessage} />
       <div className="stage">
         <ErrorBoundary fallback={<AgencyFallback />}>
@@ -94,7 +151,11 @@ export function App(props: { initialGame?: GameState; clockDriver?: ClockDriver 
           highlight={game.fleet.length === 0}
           onBuy={onBuy}
         />
+        <NewGameButton onClick={onAskNewGame} />
       </ManageDrawer>
+      {confirmOpen && (
+        <NewGameDialog game={game} onCancel={onCancelNewGame} onConfirm={onConfirmNewGame} />
+      )}
     </main>
   );
 }

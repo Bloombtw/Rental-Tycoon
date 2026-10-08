@@ -167,25 +167,32 @@ body,
   .app {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 380px;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
   }
 
   .app .hud {
     grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .app .save-warning {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .app .banner-slot {
     grid-column: 1 / -1;
+    grid-row: 3;
   }
 
   .stage {
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 4;
   }
 
   .drawer {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 4;
     border-radius: var(--radius) 0 0 0;
     box-shadow: -6px 0 0 rgb(0 0 0 / 0.1);
     min-height: 0;
@@ -481,6 +488,101 @@ body,
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+/* Autosave: new game button, confirmation dialog, storage warning */
+.btn-danger-quiet {
+  background: var(--c-surface);
+  color: var(--c-danger-text);
+  border: 2px solid var(--c-danger);
+}
+
+.btn-danger {
+  background: var(--c-danger);
+  color: var(--c-on-dark);
+}
+
+.btn-neutral {
+  background: var(--c-sand);
+  color: var(--c-ink);
+}
+
+.new-game-btn {
+  width: 100%;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--space-4) + env(safe-area-inset-top))
+    calc(var(--space-4) + env(safe-area-inset-right))
+    calc(var(--space-4) + env(safe-area-inset-bottom))
+    calc(var(--space-4) + env(safe-area-inset-left));
+  background: rgb(0 0 0 / 0.55);
+  animation: dialog-fade 160ms ease-out;
+}
+
+.dialog-card {
+  width: min(100% - 32px, 360px);
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--c-surface);
+  color: var(--c-ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.dialog-card h2 {
+  font-size: 1.25rem;
+  text-wrap: balance;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.dialog-actions .btn {
+  flex: 1 1 0;
+}
+
+@keyframes dialog-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.save-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-2)
+    calc(var(--space-3) + env(safe-area-inset-left));
+  background: var(--c-accent-2);
+  color: var(--c-ink);
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+}
+
+.save-warning-ok {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-backdrop {
+    animation: none;
+  }
 }
 
 /* Error boundary fallback */

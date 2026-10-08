@@ -11,7 +11,9 @@ export type SimErrorCode =
   | "FLEET_FULL"
   | "UNKNOWN_CAR_MODEL"
   | "UNKNOWN_CAR"
-  | "INVALID_PRICE";
+  | "INVALID_PRICE"
+  | "INVALID_GAME_STATE"
+  | "UNSUPPORTED_STATE_VERSION";
 
 /** Base class of every typed sim error. Extends RangeError for compatibility. */
 export abstract class SimError extends RangeError {
