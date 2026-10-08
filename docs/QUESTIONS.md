@@ -26,3 +26,17 @@ Les questions qui demandent une décision humaine. Le travail ne bloque pas dess
 
 4. **Mesure sur un vrai iPhone (suite de la question 3 d'`agency-view`).** Le budget de 250 draw calls et 1 M de triangles, le palier de qualité automatique et le seuil de 30 fps sont vérifiés en émulation.
    _Recommandation_ : fusionner sur la base de l'émulation, puis faire relever par un humain `data-quality`, `data-draw-calls` et le ressenti sur iPhone (PWA installée, à 20:30 avec beaucoup de voitures) avant la Phase 1.
+
+## city-life (révision 2, constats après implémentation)
+
+5. **Orientation des bandes du passage piéton (`road-crossing`).** La tuile est posée avec le même quart de tour que la route droite ; les captures ne permettent pas de trancher si les bandes sont dans le bon sens.
+   _Recommandation_ : regarder au zoom maximal sur iPhone ; si c'est faux, c'est une valeur de `ASSET_TURN_OFFSET` dans `scene/assets.ts`.
+
+6. **Position des halos de l'enseigne « LOCATION ».** Placés à l'estime.
+   _Recommandation_ : vérifier à 20:30 sur un appareil.
+
+7. **Couleur du sol.** L'asphalte et la dalle paraissent bleu marine foncé à toute heure (couleur existante `palette.lot`, 0x3d405b).
+   _Recommandation_ : la garder pour l'instant (cohérente avec la palette) ; l'éclaircir si le rendu paraît terne sur iPhone.
+
+8. **Flotte de 50 voitures non mesurée.** La caisse de départ ne permet d'acheter qu'une douzaine de voitures : draw calls et fps à 50 voitures restent à relever.
+   _Recommandation_ : relever lors du test iPhone (question 4), une fois la sauvegarde disponible pour préparer une partie avancée.
