@@ -100,8 +100,9 @@ describe("loadInitialState", () => {
   });
   it("resumes a valid save paused with notice and speed", () => {
     const storage = memoryStorage({ [SAVE_KEY]: encodeSave(played, 10, 1) });
-    const r = loadInitialState({ storage, newSeed: seed });
+    const r = loadInitialState({ storage, newSeed: seed, now: 1 }); // no time away
     expect(r.ui.game).toEqual(played);
+    expect(r.ui.offline).toBeNull();
     expect(r.ui.speed).toBe(10);
     expect(r.ui.paused).toBe(true);
     expect(r.ui.hasRun).toBe(false);

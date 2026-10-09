@@ -1,6 +1,6 @@
 import { createGame, type GameState } from "@rt/sim";
 import { formatClock, type Speed } from "./clock.js";
-import { initUiState, type UiState } from "./gameReducer.js";
+import { gameReducer, initUiState, type UiState } from "./gameReducer.js";
 import { resumeNotice, SAVE_CORRUPT_ERROR, SAVE_NEWER_ERROR } from "./messages.js";
 import { decodeSave, encodeSave, REJECTED_SAVE_KEY, SAVE_KEY } from "./saveFormat.js";
 import type { SaveStorage } from "./saveStorage.js";
@@ -29,6 +29,8 @@ export function loadInitialState(o: {
   storage: SaveStorage | null;
   newSeed: () => number;
   initialGame?: GameState;
+  /** Wall clock in ms (tests). Defaults to Date.now(). */
+  now?: number;
 }): InitResult {
   const fresh = (): UiState => initUiState(createGame(o.newSeed()));
   const { storage } = o;
@@ -47,15 +49,19 @@ export function loadInitialState(o: {
   const decoded = decodeSave(raw);
   if (decoded.kind === "empty") return { ui: fresh(), status: "ok" };
   if (decoded.kind === "ok") {
-    const { game, speed } = decoded;
-    return {
-      ui: {
-        ...initUiState(game),
-        speed,
-        notice: resumeNotice(formatClock(game.day, game.minute)),
-      },
-      status: "ok",
+    const { game, speed, savedAt } = decoded;
+    const resumed: UiState = {
+      ...initUiState(game),
+      speed,
+      notice: resumeNotice(formatClock(game.day, game.minute)),
     };
+    // Offline earnings for the time the app was closed (a future savedAt gives nothing).
+    const now = o.now ?? Date.now();
+    const ui =
+      savedAt === null
+        ? resumed
+        : gameReducer(resumed, { type: "returnAfter", elapsedMs: now - savedAt });
+    return { ui, status: "ok" };
   }
 
   // Rejected: keep the raw text in the backup slot, then start over. If the backup fails, the

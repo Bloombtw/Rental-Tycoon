@@ -12,6 +12,7 @@ import {
 import { formatCents } from "../format.js";
 import { dayBannerText, isSpeed, type Speed } from "./clock.js";
 import { CAR_MODEL_LABELS, NEW_GAME_NOTICE, errorMessage } from "./messages.js";
+import { offlineDays, playOffline, type OfflineReport } from "./offline.js";
 
 export const DEFAULT_SEED = 1;
 
@@ -27,6 +28,8 @@ export interface UiState {
   readonly hasRun: boolean;
   /** "New day" toast text. */
   readonly dayBanner: string | null;
+  /** Result of the last absence, shown until the player taps "Récupérer". Already in `game`. */
+  readonly offline: OfflineReport | null;
 }
 
 export type GameAction =
@@ -38,7 +41,10 @@ export type GameAction =
   | { type: "pause" }
   | { type: "dismissMessage" }
   | { type: "dismissDayBanner" }
-  | { type: "newGame"; seed: number };
+  | { type: "newGame"; seed: number }
+  /** The player was away `elapsedMs` (closed app or background): play the offline days. */
+  | { type: "returnAfter"; elapsedMs: number }
+  | { type: "claimOffline" };
 
 function isSeed(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 2 ** 32;
@@ -53,6 +59,26 @@ export function initUiState(game?: GameState): UiState {
     paused: true,
     hasRun: false,
     dayBanner: null,
+    offline: null,
+  };
+}
+
+/** Plays the offline days of an absence; a second absence before the claim adds up. */
+function returnAfter(state: UiState, elapsedMs: unknown): UiState {
+  const played = playOffline(state.game, offlineDays(elapsedMs));
+  if (played === null) return state;
+  const prev = state.offline;
+  const report: OfflineReport =
+    prev === null
+      ? played.report
+      : { days: prev.days + played.report.days, delta: prev.delta + played.report.delta };
+  return {
+    ...state,
+    game: played.game,
+    offline: report,
+    paused: true,
+    dayBanner: null,
+    notice: null,
   };
 }
 
@@ -114,6 +140,10 @@ function reduce(state: UiState, action: GameAction): UiState {
       if (!isSeed(seed)) return state;
       return { ...initUiState(createGame(seed)), notice: NEW_GAME_NOTICE };
     }
+    case "returnAfter":
+      return returnAfter(state, (action as { elapsedMs?: unknown }).elapsedMs);
+    case "claimOffline":
+      return state.offline === null ? state : { ...state, offline: null };
     case "dismissMessage":
       return { ...state, error: null, notice: null };
     case "dismissDayBanner":

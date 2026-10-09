@@ -88,7 +88,7 @@ function saved(s: FakeStorage): GameState {
 describe("resume", () => {
   it("restores the saved game paused, with a notice", () => {
     const game = advanceMinutes(advanceMinutes(buyCar(createGame(5), "compact"), 700), 300);
-    const s = memoryStorage({ [SAVE_KEY]: encodeSave(game, 4, 1) });
+    const s = memoryStorage({ [SAVE_KEY]: encodeSave(game, 4, Date.now()) }); // no time away
     mount(s);
     expect(byId("hud-clock").textContent).toContain("Jour 2");
     expect(byId("notice").textContent).toContain("Partie reprise : Jour 2");

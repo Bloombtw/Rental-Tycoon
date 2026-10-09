@@ -12,6 +12,7 @@ import { MessageBanner } from "./components/MessageBanner.js";
 import type { Speed } from "./game/clock.js";
 import { NewGameButton } from "./components/NewGameButton.js";
 import { NewGameDialog } from "./components/NewGameDialog.js";
+import { OfflineDialog } from "./components/OfflineDialog.js";
 import { SaveWarning } from "./components/SaveWarning.js";
 import { gameReducer } from "./game/gameReducer.js";
 import { loadInitialState } from "./game/persistence.js";
@@ -101,14 +102,22 @@ export function App(props: {
     onCommit,
   });
 
-  // Hidden page -> pause, and stay paused on return.
+  // Hidden page -> pause, and stay paused on return. The time away earns offline days.
   useEffect(() => {
+    let hiddenAt: number | null = null;
     const pause = (): void => {
       dispatch({ type: "pause" });
       flush();
     };
     const onVisibility = (): void => {
-      if (document.visibilityState === "hidden") pause();
+      if (document.visibilityState === "hidden") {
+        hiddenAt ??= Date.now();
+        pause();
+      } else if (hiddenAt !== null) {
+        const elapsedMs = Date.now() - hiddenAt;
+        hiddenAt = null;
+        dispatch({ type: "returnAfter", elapsedMs });
+      }
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", pause);
@@ -117,6 +126,10 @@ export function App(props: {
       window.removeEventListener("pagehide", pause);
     };
   }, [flush]);
+
+  const onClaimOffline = useCallback(() => {
+    dispatch({ type: "claimOffline" });
+  }, []);
 
   const makeSeed = props.newSeed ?? newSeed;
   const onAskNewGame = useCallback(() => {
@@ -208,6 +221,9 @@ export function App(props: {
       </ManageDrawer>
       {confirmOpen && (
         <NewGameDialog game={game} onCancel={onCancelNewGame} onConfirm={onConfirmNewGame} />
+      )}
+      {ui.offline !== null && !confirmOpen && (
+        <OfflineDialog report={ui.offline} onClaim={onClaimOffline} />
       )}
     </main>
   );
