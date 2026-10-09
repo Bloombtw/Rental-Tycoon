@@ -33,7 +33,9 @@ export type IconName =
   | "trend-down"
   | "gem"
   | "shop"
-  | "bolt";
+  | "bolt"
+  | "sound-on"
+  | "sound-off";
 
 export type IconSize = 16 | 20 | 24 | 32 | 40 | 48;
 
@@ -65,6 +67,20 @@ function glyph(name: IconName): JSX.Element {
           <path d="M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11z" />
           <path d="M5.5 14v6h13v-6" />
           <path d="M10 20v-4h4v4" />
+        </>
+      );
+    case "sound-on":
+      return (
+        <>
+          <path d="M4 9h4l5-4v14l-5-4H4z" />
+          <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+        </>
+      );
+    case "sound-off":
+      return (
+        <>
+          <path d="M4 9h4l5-4v14l-5-4H4z" />
+          <path d="M17 9l5 6M22 9l-5 6" />
         </>
       );
     case "bolt":

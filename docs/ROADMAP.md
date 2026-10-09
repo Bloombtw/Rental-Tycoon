@@ -81,7 +81,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 
 ## Plus tard (si le temps le permet)
 
-- ⬜ **Sons et vibrations** (désactivables) : encaissement, achat, fin de journée. **Attend les fichiers audio** (packs Kenney Interface Sounds / Casino Audio / Music Jingles en `.mp3` dans `apps/web/public/assets/sounds/`). Vibrations : Android seulement (Safari iOS ne les permet pas).
+- ✅ **Sons** (`sounds.md`) : musique de fond, ambiance de ville, son d'encaissement, bouton son dans le HUD. Vibrations non faites (Safari iOS ne les permet pas).
 - ⬜ **Nouvelles agences** (centre-ville, gare, aéroport) avec demande et clientèle différentes ; on bascule de l'une à l'autre.
 - ⬜ **Crédit et faillite** : emprunt pour acheter au-delà de la caisse, game over après X jours de découvert.
 - ⬜ **Statistiques** : historique des jours, graphique de la caisse, rentabilité par modèle.

@@ -34,6 +34,7 @@ import {
 } from "./game/payments.js";
 import { Icon } from "./ui/icons.js";
 import { calendarDay } from "./game/calendar.js";
+import { useGameAudio } from "./game/useGameAudio.js";
 import { DayBanner } from "./components/DayBanner.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { FleetPanel } from "./components/FleetPanel.js";
@@ -89,6 +90,7 @@ export function App(props: {
   const drawerRef = useRef<HTMLElement>(null);
   const insets = useObscuredInsets({ hud: topRef, drawer: drawerRef });
   const { game } = ui;
+  const sound = useGameAudio(game, storage);
   const capacity = fleetCapacity(game.upgrades);
 
   // The side panel (wide screens) starts under the HUD, whatever toasts are showing below it.
@@ -340,6 +342,8 @@ export function App(props: {
         <Hud
           ref={hudRef}
           game={game}
+          muted={sound.muted}
+          onToggleMute={sound.toggleMute}
           speed={ui.speed}
           paused={ui.paused}
           hasRun={ui.hasRun}

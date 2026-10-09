@@ -15,6 +15,9 @@ interface HudProps {
   readonly hasRun: boolean;
   readonly onSetSpeed: (speed: Speed) => void;
   readonly onTogglePause: () => void;
+  /** Sound off (sounds.md). The button is hidden without a handler. */
+  readonly muted?: boolean;
+  readonly onToggleMute?: () => void;
 }
 
 /** Minutes since 09:00 at which the sun icon turns into a sunset (18:00) and a moon (20:00). */
@@ -65,7 +68,7 @@ function Report({ game }: { readonly game: GameState }) {
 
 /** Floating glass card at the top of the screen: clock, cash, speed controls and yesterday's report. */
 export const Hud = forwardRef<HTMLElement, HudProps>(function Hud(
-  { game, speed, paused, hasRun, onSetSpeed, onTogglePause },
+  { game, speed, paused, hasRun, onSetSpeed, onTogglePause, muted = false, onToggleMute },
   ref,
 ) {
   const negative = game.cash < 0;
@@ -99,6 +102,18 @@ export const Hud = forwardRef<HTMLElement, HudProps>(function Hud(
           />
         </div>
         <div className="cash-pill" data-negative={String(negative)}>
+          {onToggleMute && (
+            <button
+              type="button"
+              className="sound-toggle"
+              data-testid="sound-toggle"
+              aria-pressed={muted}
+              aria-label={muted ? "Activer le son" : "Couper le son"}
+              onClick={onToggleMute}
+            >
+              <Icon name={muted ? "sound-off" : "sound-on"} size={16} />
+            </button>
+          )}
           <Icon name="coin" size={24} className="cash-icon" />
           <span className="cash-body">
             <span className="cash-label">Caisse</span>
