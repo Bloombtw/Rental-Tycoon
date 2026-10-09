@@ -69,13 +69,16 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 6. ✅ **Managers / employés** (`managers.md`) : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
 7. ✅ **Récompense quotidienne** (`daily-reward.md`) (série de connexions).
 
+## Phase 3 — Rétention (dans cet ordre)
+
+1. ⬜ **Missions** : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
+2. ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Bannière + effet temporaire.
+3. ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
+
 ## Plus tard (si le temps le permet)
 
-- ⬜ **Sons et vibrations** (désactivables) : encaissement, achat, fin de journée.
-- ⬜ **Missions** : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
-- ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
+- ⬜ **Sons et vibrations** (désactivables) : encaissement, achat, fin de journée. **Attend les fichiers audio** (pack Kenney Interface Sounds / Casino Audio / Music Jingles en `.mp3` dans `apps/web/public/assets/sounds/`). Vibrations : Android seulement (Safari iOS ne les permet pas).
 - ⬜ **Nouvelles agences** (centre-ville, gare, aéroport) avec demande et clientèle différentes ; on bascule de l'une à l'autre.
-- ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Bannière + effet temporaire.
 - ⬜ **Crédit et faillite** : emprunt pour acheter au-delà de la caisse, game over après X jours de découvert.
 - ⬜ **Statistiques** : historique des jours, graphique de la caisse, rentabilité par modèle.
 - ⬜ **Prestige** : revendre l'entreprise contre un bonus permanent et recommencer plus vite.
