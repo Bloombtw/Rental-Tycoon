@@ -13,7 +13,9 @@ export type SimErrorCode =
   | "UNKNOWN_CAR"
   | "INVALID_PRICE"
   | "INVALID_GAME_STATE"
-  | "UNSUPPORTED_STATE_VERSION";
+  | "UNSUPPORTED_STATE_VERSION"
+  | "UNKNOWN_UPGRADE"
+  | "UPGRADE_MAXED";
 
 /** Base class of every typed sim error. Extends RangeError for compatibility. */
 export abstract class SimError extends RangeError {
@@ -105,6 +107,28 @@ export class InsufficientCashError extends SimError {
     this.name = "InsufficientCashError";
     this.required = required;
     this.available = available;
+  }
+}
+
+export class UnknownUpgradeError extends SimError {
+  readonly code = "UNKNOWN_UPGRADE" as const;
+  readonly upgrade: unknown;
+
+  constructor(upgrade: unknown) {
+    super("unknown upgrade");
+    this.name = "UnknownUpgradeError";
+    this.upgrade = upgrade;
+  }
+}
+
+export class UpgradeMaxedError extends SimError {
+  readonly code = "UPGRADE_MAXED" as const;
+  readonly upgrade: string;
+
+  constructor(upgrade: string) {
+    super("the upgrade is at its maximum level");
+    this.name = "UpgradeMaxedError";
+    this.upgrade = upgrade;
   }
 }
 

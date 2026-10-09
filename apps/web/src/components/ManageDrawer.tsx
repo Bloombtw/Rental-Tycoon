@@ -11,18 +11,21 @@ const TAP_SLOP_PX = 10;
 interface ManageDrawerProps {
   readonly open: boolean;
   readonly fleetSize: number;
+  /** Places in the parking (upgrades.md). Defaults to MAX_FLEET_SIZE. */
+  readonly capacity?: number;
   readonly onSetOpen: (open: boolean) => void;
   readonly children: ReactNode;
 }
 
 /** Floating glass bottom sheet on phones, floating side panel on wide landscape screens. */
 export const ManageDrawer = forwardRef<HTMLElement, ManageDrawerProps>(function ManageDrawer(
-  { open, fleetSize, onSetOpen, children },
+  { open, fleetSize, capacity = MAX_FLEET_SIZE, onSetOpen, children },
   ref,
 ) {
   const startY = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const size = Number.isSafeInteger(fleetSize) && fleetSize >= 0 ? fleetSize : 0;
+  const max = Number.isSafeInteger(capacity) && capacity > 0 ? capacity : MAX_FLEET_SIZE;
   return (
     <aside
       ref={ref}
@@ -63,12 +66,12 @@ export const ManageDrawer = forwardRef<HTMLElement, ManageDrawerProps>(function 
         <span className="drawer-title">
           <Icon name="fleet" size={20} className="drawer-title-icon" />
           <span className="drawer-title-text">
-            Gérer l'agence · Flotte {size}/{MAX_FLEET_SIZE}
+            Gérer l'agence · Flotte {size}/{max}
           </span>
           <span className="drawer-fleet-bar" aria-hidden="true">
             <ProgressBar
               value={size}
-              max={MAX_FLEET_SIZE}
+              max={max}
               label="Remplissage de la flotte"
               tone="money"
               thin

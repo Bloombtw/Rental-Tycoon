@@ -3,10 +3,14 @@ import {
   InsufficientCashError,
   InvalidPriceError,
   MAX_CAR_DAILY_PRICE,
+  MAX_FLEET_SIZE,
   SimOverflowError,
   UnknownCarError,
   UnknownCarModelError,
+  UnknownUpgradeError,
+  UpgradeMaxedError,
   type CarModelId,
+  type UpgradeId,
 } from "@rt/sim";
 import { formatCents } from "../format.js";
 
@@ -14,6 +18,13 @@ export const CAR_MODEL_LABELS: Readonly<Record<CarModelId, string>> = Object.fre
   used: "Citadine d'occasion",
   compact: "Citadine neuve",
   hybrid: "Berline hybride",
+});
+
+export const UPGRADE_LABELS: Readonly<Record<UpgradeId, string>> = Object.freeze({
+  parking: "Agrandir le parking",
+  counter: "Comptoir rapide",
+  ads: "Publicité",
+  wash: "Station de lavage",
 });
 
 /** Status label of a car: why it stayed at the lot at its last slot, when known. */
@@ -58,9 +69,14 @@ export function errorMessage(error: unknown): string {
       return `Fonds insuffisants : il faut ${formatCents(error.required)}, vous avez ${formatCents(error.available)}.`;
     }
     if (error instanceof FleetFullError) {
-      const max = Number.isSafeInteger(error.maxFleetSize) ? String(error.maxFleetSize) : "—";
-      return `Flotte complète : ${max} voitures maximum.`;
+      const max = Number.isSafeInteger(error.maxFleetSize) ? error.maxFleetSize : null;
+      if (max !== null && max < MAX_FLEET_SIZE) {
+        return `Parking plein : ${String(max)} places. Agrandissez le parking.`;
+      }
+      return `Flotte complète : ${max === null ? "—" : String(max)} voitures maximum.`;
     }
+    if (error instanceof UpgradeMaxedError) return "Cette amélioration est déjà au niveau maximum.";
+    if (error instanceof UnknownUpgradeError) return "Amélioration inconnue.";
     if (error instanceof UnknownCarModelError) return "Modèle de voiture inconnu.";
     if (error instanceof UnknownCarError) return "Cette voiture n'existe pas.";
     if (error instanceof InvalidPriceError) return PRICE_RANGE_ERROR;

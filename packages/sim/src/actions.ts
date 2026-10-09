@@ -1,4 +1,5 @@
-import { CAR_MODELS, MAX_CAR_DAILY_PRICE, MAX_FLEET_SIZE, type CarModelId } from "./economy.js";
+import { CAR_MODELS, MAX_CAR_DAILY_PRICE, type CarModelId } from "./economy.js";
+import { fleetCapacity } from "./upgrades.js";
 import {
   FleetFullError,
   InsufficientCashError,
@@ -15,7 +16,8 @@ export function buyCar(state: GameState, model: CarModelId): GameState {
     throw new UnknownCarModelError(model);
   }
   const spec = CAR_MODELS[model];
-  if (state.fleet.length >= MAX_FLEET_SIZE) throw new FleetFullError(MAX_FLEET_SIZE);
+  const capacity = fleetCapacity(state.upgrades);
+  if (state.fleet.length >= capacity) throw new FleetFullError(capacity);
   if (!Number.isSafeInteger(state.cash)) throw new SimOverflowError("cash");
   if (state.cash < spec.purchasePrice) {
     throw new InsufficientCashError(spec.purchasePrice, state.cash);

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
-import { type CarId, type CarModelId, type Cents, type GameState } from "@rt/sim";
+import {
+  fleetCapacity,
+  type CarId,
+  type CarModelId,
+  type Cents,
+  type GameState,
+  type UpgradeId,
+} from "@rt/sim";
+import { UpgradesPanel } from "./components/UpgradesPanel.js";
 import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
 import { BuyCarPanel } from "./components/BuyCarPanel.js";
 import { DayBanner } from "./components/DayBanner.js";
@@ -56,6 +64,7 @@ export function App(props: {
   const drawerRef = useRef<HTMLElement>(null);
   const insets = useObscuredInsets({ hud: topRef, drawer: drawerRef });
   const { game } = ui;
+  const capacity = fleetCapacity(game.upgrades);
 
   // The side panel (wide screens) starts under the HUD, whatever toasts are showing below it.
   useEffect(() => {
@@ -156,6 +165,9 @@ export function App(props: {
   const onBuy = useCallback((model: CarModelId) => {
     dispatch({ type: "buyCar", model });
   }, []);
+  const onBuyUpgrade = useCallback((upgrade: UpgradeId) => {
+    dispatch({ type: "buyUpgrade", upgrade });
+  }, []);
   const onDismissMessage = useCallback(() => {
     dispatch({ type: "dismissMessage" });
   }, []);
@@ -208,15 +220,18 @@ export function App(props: {
         ref={drawerRef}
         open={drawerOpen}
         fleetSize={game.fleet.length}
+        capacity={capacity}
         onSetOpen={setDrawerOpen}
       >
         <FleetPanel fleet={game.fleet} onSetPrice={onSetPrice} />
         <BuyCarPanel
           cash={game.cash}
           fleetSize={game.fleet.length}
+          capacity={capacity}
           highlight={game.fleet.length === 0}
           onBuy={onBuy}
         />
+        <UpgradesPanel cash={game.cash} upgrades={game.upgrades} onBuy={onBuyUpgrade} />
         <NewGameButton onClick={onAskNewGame} />
       </ManageDrawer>
       {confirmOpen && (

@@ -17,11 +17,10 @@ Dependency direction: `web → sim`, `server → sim`. `sim` imports nothing fro
 
 ## How we work (the lead = main session)
 
-- The main session orchestrates; it delegates code to the owner agents instead of writing it itself. Use `/feature` for anything non-trivial.
-- No code without a spec in `docs/specs/` first.
-- Launch independent agents **in parallel in one message**. Hand each one the spec path and the exact contract (types, function signatures, routes) so parallel work fits together.
-- Agents write only inside their scope: Edit/Write are checked by `guard-scope`, and Bash is limited by `guard-bash` to an allowlist of verification commands (npm scripts, vitest, read-only git). Files are changed with Edit/Write only. Report cross-scope needs to the lead.
-- A feature is done only when `npm run check` is green, `qa-breaker` has attacked it and `reviewer` approved.
+- **Deadline mode: favor speed.** The main session writes code directly for small and medium changes. Delegate to owner agents only for big, independent parts worth running in parallel (hand each one the exact contract: types, function signatures, routes).
+- A spec in `docs/specs/` only for big features or economy changes; keep it short.
+- Agents write only inside their scope (Edit/Write checked by `guard-scope`). Report cross-scope needs to the lead.
+- A feature is done when `npm run check` is green. `qa-breaker` and `reviewer` are optional: run them only when asked.
 
 ## Rules that are always true
 
@@ -43,7 +42,7 @@ Dependency direction: `web → sim`, `server → sim`. `sim` imports nothing fro
 
 ## Safety net (automatic)
 
-- PostToolUse hook: prettier + eslint --fix on every edited file; leftover lint errors are fed back to the agent.
-- Stop hook: typecheck + tests must pass before the lead finishes a turn.
+- PostToolUse hook: prettier on every edited file (lint runs at commit and in `npm run check`).
+- Stop hook: typecheck + tests related to changed files (`vitest --changed`) must pass before the lead finishes a turn.
 - Pre-commit (husky + lint-staged), and GitHub Actions CI runs `npm run check` + build.
 - Every push to `main` deploys the PWA to GitHub Pages (`.github/workflows/deploy.yml`).

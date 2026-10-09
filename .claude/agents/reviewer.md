@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Read-only code reviewer. Checks a diff against CLAUDE.md rules, the spec and the acceptance criteria before the lead merges. Use at the end of every feature.
+description: Read-only code reviewer. Checks a diff against CLAUDE.md rules, the spec and the acceptance criteria before the lead merges. Use only when the user asks for a review.
 tools: Read, Grep, Glob, Bash
 model: opus
 color: yellow

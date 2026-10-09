@@ -1469,6 +1469,69 @@ input {
   margin-top: var(--space-1);
 }
 
+/* -------------------------------------------------------- upgrades */
+.upgrade-card {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--c-surface-2);
+}
+
+.upgrade-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
+  background: var(--g-primary);
+  color: var(--c-on-dark);
+  box-shadow: var(--lip-primary), var(--inset-highlight);
+}
+
+.upgrade-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.upgrade-info h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.upgrade-level {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  color: var(--c-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.upgrade-effect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.upgrade-arrow {
+  transform: rotate(90deg);
+  color: var(--c-money);
+}
+
+.upgrade-btn {
+  align-self: stretch;
+}
+
 .buy-refusal {
   display: flex;
   align-items: center;
