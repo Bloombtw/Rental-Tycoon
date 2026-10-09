@@ -1,6 +1,14 @@
-import { MAX_ACCEPTED_DAILY_PRICE, MAX_FLEET_SIZE } from "./economy.js";
+import {
+  acceptanceChance,
+  DEMAND_BASE,
+  DEMAND_MAX_PCT,
+  DEMAND_MIN_PCT,
+  MAX_FLEET_SIZE,
+  referencePrice,
+} from "./economy.js";
 import { InvalidMinutesError, SimOverflowError } from "./errors.js";
-import type { Car, GameState } from "./state.js";
+import { createRng, type Rng } from "./rng.js";
+import type { Car, GameState, RentalOutcome } from "./state.js";
 
 /** Opening hours 09:00 -> 21:00, in game minutes. */
 export const DAY_MINUTES = 720;
@@ -58,17 +66,34 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   let todayRevenue = state.todayRevenue;
   let day = state.day;
   let lastDay = state.lastDay;
+  const left = state.customersLeft;
+  let customersLeft = typeof left === "number" && Number.isSafeInteger(left) && left > 0 ? left : 0;
   let copy: Car[] | null = null;
+  // Created on first draw only, so a span without random events leaves rngState untouched.
+  const lazy: { rng: Rng | null } = { rng: null };
+  const draw = (): Rng => (lazy.rng ??= createRng(state.rngState));
 
-  /** Processes departure slots in minutes [from, to). */
+  /** Processes departure slots in minutes [from, to). Minute 0 opens the day: customers are drawn. */
   const depart = (from: number, to: number): void => {
     if (to <= from) return;
+    if (from === 0) {
+      const pct = draw().int(DEMAND_MIN_PCT, DEMAND_MAX_PCT);
+      customersLeft = DEMAND_BASE + Math.round((state.fleet.length * pct) / 100);
+    }
     const first = Math.ceil(from / DEPARTURE_STAGGER_MINUTES);
     const limit = Math.min(state.fleet.length, MAX_FLEET_SIZE);
     for (let i = first; i < limit && i * DEPARTURE_STAGGER_MINUTES < to; i++) {
       const car = state.fleet[i];
       if (car === undefined) continue;
-      const rented = car.dailyPrice <= MAX_ACCEPTED_DAILY_PRICE;
+      let outcome: RentalOutcome;
+      if (!(customersLeft > 0)) {
+        outcome = "noCustomer";
+      } else {
+        customersLeft -= 1;
+        const chance = acceptanceChance(car.dailyPrice, referencePrice(car));
+        outcome = draw().next() < chance ? "rented" : "tooExpensive";
+      }
+      const rented = outcome === "rented";
       if (rented) {
         cash += car.dailyPrice;
         todayRevenue += car.dailyPrice;
@@ -76,9 +101,10 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
           throw new SimOverflowError("cash");
         }
       }
-      if (copy === null ? car.rented !== rented : copy[i]?.rented !== rented) {
+      const current = copy?.[i] ?? car;
+      if (current.rented !== rented || current.outcome !== outcome) {
         if (copy === null) copy = state.fleet.slice();
-        copy[i] = { ...car, rented };
+        copy[i] = { ...car, rented, outcome };
       }
     }
   };
@@ -102,11 +128,12 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   }
   return {
     seed: state.seed,
-    rngState: state.rngState,
+    rngState: lazy.rng === null ? state.rngState : lazy.rng.state(),
     day,
     minute,
     cash,
     todayRevenue,
+    customersLeft,
     fleet: copy ?? state.fleet,
     lastDay,
   };

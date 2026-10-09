@@ -1,7 +1,7 @@
 import { departureMinute, returnMinute, type Car } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { formatTimeOfDay } from "../game/clock.js";
-import { CAR_MODEL_LABELS } from "../game/messages.js";
+import { CAR_MODEL_LABELS, carStatusLabel } from "../game/messages.js";
 
 export interface CarTooltipContent {
   readonly title: string;
@@ -28,7 +28,11 @@ export function carTooltip(car: Car, index: number, timeOfDay: number): CarToolt
   if (rented && dep !== null && ret !== null && t >= dep && t < ret) {
     status = `En location, retour à ${formatTimeOfDay(ret)}`;
   } else {
-    status = rented && dep !== null && t >= dep ? "Au parking (louée aujourd'hui)" : "Au parking";
+    if (rented) {
+      status = dep !== null && t >= dep ? "Au parking (louée aujourd'hui)" : "Au parking";
+    } else {
+      status = carStatusLabel(car);
+    }
   }
   return { title, status, price: `Prix : ${formatCents(car.dailyPrice)}/jour`, rented };
 }

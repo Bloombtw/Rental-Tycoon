@@ -23,7 +23,7 @@ import { FleetFullError, InsufficientCashError } from "@rt/sim";
 
 const IDLE: readonly NewCar[] = [
   { dailyPrice: 200_00, dailyCost: 30_00 },
-  { dailyPrice: 160_00, dailyCost: 20_00 },
+  { dailyPrice: 180_00, dailyCost: 20_00 }, // 2x the fixture reference price: never rented
 ];
 const MIXED: readonly NewCar[] = [
   { dailyPrice: 100_00, dailyCost: 30_00 },

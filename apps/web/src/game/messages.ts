@@ -16,6 +16,17 @@ export const CAR_MODEL_LABELS: Readonly<Record<CarModelId, string>> = Object.fre
   hybrid: "Berline hybride",
 });
 
+/** Status label of a car: why it stayed at the lot at its last slot, when known. */
+export function carStatusLabel(car: {
+  readonly rented: boolean;
+  readonly outcome?: unknown;
+}): string {
+  if (car.rented === true) return "Louée";
+  if (car.outcome === "tooExpensive") return "Au parking · trop cher";
+  if (car.outcome === "noCustomer") return "Au parking · pas de client";
+  return "Au parking";
+}
+
 export const PRICE_FORMAT_ERROR = "Format invalide : saisissez un montant en euros, par ex. 89,90.";
 
 export const PRICE_RANGE_ERROR = `Le prix doit être compris entre ${formatCents(0)} et ${formatCents(MAX_CAR_DAILY_PRICE)} par jour.`;

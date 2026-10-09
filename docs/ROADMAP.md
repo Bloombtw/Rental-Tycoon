@@ -55,7 +55,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 ## Phase 1 — Les fondations du genre
 
 1. ✅ **Sauvegarde automatique** (`autosave.md`) (`localStorage`, depuis `apps/web`) + `validateGameState` dans le sim, seed aléatoire par partie. Reprise au retour sur l'app. Indispensable : Safari iOS décharge souvent la PWA en arrière-plan.
-2. ⬜ **Demande client tirée au sort** (via `rng.ts`) : nombre de clients par jour, probabilité d'acceptation décroissante avec le prix. Remplace le seuil fixe `MAX_ACCEPTED_DAILY_PRICE` (aujourd'hui 150 € est toujours optimal : aucune vraie décision). Le badge « Au parking » dit pourquoi (« trop cher », « pas de client »).
+2. ✅ **Demande client tirée au sort** (`random-demand.md`) (via `rng.ts`) : nombre de clients par jour, probabilité d'acceptation décroissante avec le prix. Remplace le seuil fixe `MAX_ACCEPTED_DAILY_PRICE` (aujourd'hui 150 € est toujours optimal : aucune vraie décision). Le badge « Au parking » dit pourquoi (« trop cher », « pas de client »).
 3. ⬜ **Gains hors ligne** : à la réouverture, écran « Pendant ton absence : +X € » avec bouton « Récupérer ». Plafond de durée (ex. 8 h), améliorable plus tard. Calcul via la sim pure (`advance`), simplifié si nécessaire pour rester rapide.
 
 ## Phase 2 — Retour visuel (« juice »)
