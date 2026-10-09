@@ -2,6 +2,9 @@ import { useCallback, useEffect, useReducer, useRef, useState, type CSSPropertie
 import { flushSync } from "react-dom";
 import {
   canClaimDailyReward,
+  revenueMultiplier,
+  type BoosterId,
+  type ProductId,
   fleetCapacity,
   nextStreak,
   type CarId,
@@ -17,6 +20,17 @@ import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
 import { BuyCarPanel } from "./components/BuyCarPanel.js";
 import { CoachCard } from "./components/CoachCard.js";
 import { DailyRewardDialog } from "./components/DailyRewardDialog.js";
+import { DemoCheckout } from "./components/DemoCheckout.js";
+import { ShopDialog } from "./components/ShopDialog.js";
+import { gemsText } from "./game/messages.js";
+import {
+  fetchLiveReceipt,
+  paymentsConfig,
+  PENDING_ORDER_KEY,
+  startLiveCheckout,
+  testReceipt,
+} from "./game/payments.js";
+import { Icon } from "./ui/icons.js";
 import { calendarDay } from "./game/calendar.js";
 import { DayBanner } from "./components/DayBanner.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
@@ -174,11 +188,96 @@ export function App(props: {
   const onClaimDailyReward = useCallback(() => {
     dispatch({ type: "claimDailyReward", today });
   }, [today]);
+  // Shop (shop.md): test mode unless a payments endpoint is configured.
+  const [payments] = useState(() => paymentsConfig());
+  const [shopOpen, setShopOpen] = useState(false);
+  const [checkout, setCheckout] = useState<ProductId | null>(null);
+  const [liveBusy, setLiveBusy] = useState<ProductId | null>(null);
+  const onOpenShop = useCallback(() => {
+    setShopOpen(true);
+  }, []);
+  const onCloseShop = useCallback(() => {
+    setShopOpen(false);
+  }, []);
+  const onBoost = useCallback((booster: BoosterId) => {
+    dispatch({ type: "activateBooster", booster });
+  }, []);
+  const onBuyProduct = useCallback(
+    (productId: ProductId) => {
+      if (payments.mode === "test") {
+        setCheckout(productId);
+        return;
+      }
+      setLiveBusy(productId);
+      startLiveCheckout(payments, productId).then(
+        ({ orderId, invoiceUrl }) => {
+          try {
+            localStorage.setItem(PENDING_ORDER_KEY, orderId);
+          } catch {
+            // the ?order= return parameter still resumes it
+          }
+          window.location.assign(invoiceUrl);
+        },
+        () => {
+          setLiveBusy(null);
+          dispatch({ type: "purchaseFailed" });
+        },
+      );
+    },
+    [payments],
+  );
+  const onDemoPaid = useCallback(() => {
+    if (checkout === null) return;
+    dispatch({ type: "grantPurchase", receipt: testReceipt(checkout, crypto.randomUUID()) });
+    setCheckout(null);
+  }, [checkout]);
+  const onDemoCancel = useCallback(() => {
+    setCheckout(null);
+  }, []);
+  // Live mode: back from the crypto payment page, wait for the signed receipt.
+  useEffect(() => {
+    if (payments.mode !== "live") return undefined;
+    let stored: string | null;
+    try {
+      stored = localStorage.getItem(PENDING_ORDER_KEY);
+    } catch {
+      stored = null; // storage blocked: the ?order= return parameter still works
+    }
+    const fromUrl = new URLSearchParams(window.location.search).get("order");
+    const orderId = fromUrl ?? stored;
+    if (!orderId) return undefined;
+    let stopped = false;
+    let tries = 0;
+    const poll = (): void => {
+      if (stopped) return;
+      tries += 1;
+      void fetchLiveReceipt(payments, orderId).then((receipt) => {
+        if (stopped) return;
+        if (receipt) {
+          dispatch({ type: "grantPurchase", receipt });
+          try {
+            localStorage.removeItem(PENDING_ORDER_KEY);
+          } catch {
+            // harmless: the grant is idempotent
+          }
+          window.history.replaceState(null, "", window.location.pathname);
+        } else if (tries < 40) {
+          setTimeout(poll, 3000);
+        }
+      });
+    };
+    poll();
+    return () => {
+      stopped = true;
+    };
+  }, [payments]);
+
   const showDailyReward =
     props.dailyReward !== false &&
     ui.tutorial === "done" &&
     ui.offline === null &&
     !confirmOpen &&
+    !shopOpen &&
     canClaimDailyReward(game, today);
 
   const makeSeed = props.newSeed ?? newSeed;
@@ -301,6 +400,34 @@ export function App(props: {
       )}
       {ui.offline !== null && !confirmOpen && (
         <OfflineDialog report={ui.offline} onClaim={onClaimOffline} />
+      )}
+      <button
+        type="button"
+        className="shop-fab"
+        data-testid="shop-open"
+        style={{ bottom: `calc(${String(insets.bottom)}px + var(--space-4))` }}
+        aria-label={`Boutique, ${gemsText(game.shop.gems)}`}
+        onClick={onOpenShop}
+      >
+        <Icon name="shop" size={24} />
+        <span className="shop-fab-gems">
+          <Icon name="gem" size={16} />
+          {game.shop.gems}
+        </span>
+        {revenueMultiplier(game) > 1 && <span className="shop-fab-boost">×2</span>}
+      </button>
+      {shopOpen && checkout === null && (
+        <ShopDialog
+          game={game}
+          mode={payments.mode}
+          busy={liveBusy}
+          onBuy={onBuyProduct}
+          onBoost={onBoost}
+          onClose={onCloseShop}
+        />
+      )}
+      {checkout !== null && (
+        <DemoCheckout productId={checkout} onPaid={onDemoPaid} onCancel={onDemoCancel} />
       )}
       {showDailyReward && (
         <DailyRewardDialog

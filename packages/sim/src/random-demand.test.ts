@@ -52,7 +52,7 @@ describe("constants", () => {
     expect(DEMAND_MIN_PCT).toBe(70);
     expect(DEMAND_MAX_PCT).toBe(115);
     expect(FIXTURE_REFERENCE_PRICE).toBe(90_00);
-    expect(GAME_STATE_VERSION).toBe(6); // v3 upgrades, v4 xp, v5 managers, v6 daily reward
+    expect(GAME_STATE_VERSION).toBe(7); // v3 upgrades, v4 xp, v5 managers, v6 daily reward, v7 shop
     expect([...RENTAL_OUTCOMES]).toEqual(["rented", "tooExpensive", "noCustomer"]);
   });
 });

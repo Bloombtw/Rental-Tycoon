@@ -19,6 +19,14 @@ import {
 import { DAY_MINUTES } from "./time.js";
 import { NO_DAILY_REWARD, type DailyRewardState } from "./dailyReward.js";
 import {
+  MAX_CLAIMED_ORDERS,
+  NO_BOOSTS,
+  PRODUCT_IDS,
+  PRODUCTS,
+  type ProductId,
+  type ShopState,
+} from "./shop.js";
+import {
   MANAGER_IDS,
   NO_MANAGERS,
   SALES_BONUS_PCT,
@@ -37,7 +45,7 @@ import {
 } from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 6;
+export const GAME_STATE_VERSION = 7;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -194,6 +202,7 @@ function parse(raw: unknown): GameState {
   const xp = int(own(raw, "xp"), "xp", 0, Number.MAX_SAFE_INTEGER);
   const managers = parseManagers(own(raw, "managers"));
   const dailyReward = parseDailyReward(own(raw, "dailyReward"));
+  const shop = parseShop(own(raw, "shop"));
 
   return {
     seed,
@@ -207,12 +216,63 @@ function parse(raw: unknown): GameState {
     xp,
     managers,
     dailyReward,
+    shop,
     fleet,
     lastDay,
   };
 }
 
 /** v3 → v4: adds `xp` (a fresh agency: level 1, the first three models stay buyable). */
+/** v6 → v7: adds `shop` (no diamonds, no booster, nothing bought). */
+function migrateV6(raw: unknown): unknown {
+  return isRecord(raw)
+    ? { ...raw, shop: { gems: 0, boosts: { ...NO_BOOSTS }, owned: [], claimedOrders: [] } }
+    : raw;
+}
+
+function parseShop(raw: unknown): ShopState {
+  if (!isRecord(raw)) throw new InvalidGameStateError("shop", "type");
+  const gems = int(own(raw, "gems"), "shop.gems", 0, Number.MAX_SAFE_INTEGER);
+  const rawBoosts = own(raw, "boosts");
+  if (!isRecord(rawBoosts)) throw new InvalidGameStateError("shop.boosts", "type");
+  const boosts = {
+    revenueUntilDay: int(
+      own(rawBoosts, "revenueUntilDay"),
+      "shop.boosts.revenueUntilDay",
+      0,
+      Number.MAX_SAFE_INTEGER,
+    ),
+    demandUntilDay: int(
+      own(rawBoosts, "demandUntilDay"),
+      "shop.boosts.demandUntilDay",
+      0,
+      Number.MAX_SAFE_INTEGER,
+    ),
+  };
+  const rawOwned = own(raw, "owned");
+  if (!Array.isArray(rawOwned)) throw new InvalidGameStateError("shop.owned", "type");
+  const owned: ProductId[] = [];
+  for (const o of rawOwned as unknown[]) {
+    const id = PRODUCT_IDS.find((p) => p === o);
+    if (id === undefined || !PRODUCTS[id].oneTime || owned.includes(id)) {
+      throw new InvalidGameStateError("shop.owned", "range");
+    }
+    owned.push(id);
+  }
+  const rawOrders = own(raw, "claimedOrders");
+  if (!Array.isArray(rawOrders) || rawOrders.length > MAX_CLAIMED_ORDERS) {
+    throw new InvalidGameStateError("shop.claimedOrders", "type");
+  }
+  const claimedOrders: string[] = [];
+  for (const o of rawOrders as unknown[]) {
+    if (typeof o !== "string" || o.length === 0 || o.length > 128) {
+      throw new InvalidGameStateError("shop.claimedOrders", "type");
+    }
+    claimedOrders.push(o);
+  }
+  return { gems, boosts, owned, claimedOrders };
+}
+
 /** v5 → v6: adds `dailyReward` (never claimed). */
 function migrateV5(raw: unknown): unknown {
   return isRecord(raw) ? { ...raw, dailyReward: { ...NO_DAILY_REWARD } } : raw;
@@ -296,6 +356,7 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
     if (stateVersion < 4) data = migrateV3(data);
     if (stateVersion < 5) data = migrateV4(data);
     if (stateVersion < 6) data = migrateV5(data);
+    if (stateVersion < 7) data = migrateV6(data);
   } catch {
     throw new InvalidGameStateError("$", "type");
   }

@@ -8,6 +8,7 @@ import {
   MAX_CAR_DAILY_COST,
   MAX_CAR_DAILY_PRICE,
   MAX_FLEET_SIZE,
+  INITIAL_SHOP,
   NO_DAILY_REWARD,
   NO_MANAGERS,
   NO_UPGRADES,
@@ -102,6 +103,7 @@ function stateOf(
     xp: 0,
     managers: NO_MANAGERS,
     dailyReward: NO_DAILY_REWARD,
+    shop: INITIAL_SHOP,
     fleet,
     lastDay: null,
     ...extra,
@@ -122,6 +124,7 @@ const STATE_KEYS = [
   "xp",
   "managers",
   "dailyReward",
+  "shop",
 ].sort();
 
 /** Parking at its maximum (50 places) so the tests can buy freely (upgrades.md). */

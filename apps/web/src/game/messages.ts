@@ -1,6 +1,10 @@
 import {
   CAR_MODELS,
   CAR_MODEL_IDS,
+  PRODUCTS,
+  BoosterUnaffordableError,
+  InvalidReceiptError,
+  ProductAlreadyOwnedError,
   FleetFullError,
   InsufficientCashError,
   InvalidPriceError,
@@ -15,7 +19,9 @@ import {
   UnknownUpgradeError,
   UpgradeMaxedError,
   type CarModelId,
+  type BoosterId,
   type ManagerId,
+  type ProductId,
   type UpgradeId,
 } from "@rt/sim";
 import { formatCents } from "../format.js";
@@ -37,6 +43,40 @@ export const UPGRADE_LABELS: Readonly<Record<UpgradeId, string>> = Object.freeze
   ads: "Publicité",
   wash: "Station de lavage",
 });
+
+export const PURCHASE_FAILED_ERROR =
+  "Le paiement n'a pas pu démarrer. Vérifiez votre connexion et réessayez.";
+
+export const BOOSTER_LABELS: Readonly<Record<BoosterId, string>> = Object.freeze({
+  revenue_x2: "Recettes ×2 (1 jour)",
+  revenue_x2_3d: "Recettes ×2 (3 jours)",
+  demand_plus: "Affluence +50 % (1 jour)",
+  cash_bundle: "Liasse de 10 000 €",
+});
+
+export const PRODUCT_LABELS: Readonly<Record<ProductId, string>> = Object.freeze({
+  starter_pack: "Pack de démarrage",
+  gems_small: "Poignée de diamants",
+  gems_medium: "Sac de diamants",
+  gems_large: "Coffre de diamants",
+  gems_huge: "Trésor de diamants",
+});
+
+const gemFormat = new Intl.NumberFormat("fr-FR");
+
+/** "1 200 diamants". */
+export function gemsText(n: number): string {
+  const v = Number.isSafeInteger(n) && n >= 0 ? n : 0;
+  return `${gemFormat.format(v)} diamant${v > 1 ? "s" : ""}`;
+}
+
+/** Notice after a credited purchase. */
+export function purchaseNotice(productId: string): string {
+  if (!Object.hasOwn(PRODUCTS, productId)) return "Achat crédité.";
+  const p = PRODUCTS[productId as ProductId];
+  const cash = p.cash > 0 ? ` et ${formatCents(p.cash)}` : "";
+  return `Merci ! +${gemsText(p.gems)}${cash}.`;
+}
 
 export const MANAGER_LABELS: Readonly<Record<ManagerId, string>> = Object.freeze({
   sales: "Commercial",
@@ -108,6 +148,11 @@ export function errorMessage(error: unknown): string {
       return error.alreadyHired ? "Déjà embauché." : "Personne à ce poste.";
     }
     if (error instanceof UnknownManagerError) return "Poste inconnu.";
+    if (error instanceof BoosterUnaffordableError) {
+      return `Pas assez de diamants : il en faut ${String(error.required)}.`;
+    }
+    if (error instanceof ProductAlreadyOwnedError) return "Ce pack ne s'achète qu'une fois.";
+    if (error instanceof InvalidReceiptError) return "Achat invalide : rien n'a été crédité.";
     if (error instanceof UpgradeMaxedError) return "Cette amélioration est déjà au niveau maximum.";
     if (error instanceof UnknownUpgradeError) return "Amélioration inconnue.";
     if (error instanceof UnknownCarModelError) return "Modèle de voiture inconnu.";

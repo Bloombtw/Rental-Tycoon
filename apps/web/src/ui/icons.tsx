@@ -30,7 +30,10 @@ export type IconName =
   | "alert"
   | "lock"
   | "trend-up"
-  | "trend-down";
+  | "trend-down"
+  | "gem"
+  | "shop"
+  | "bolt";
 
 export type IconSize = 16 | 20 | 24 | 32 | 40 | 48;
 
@@ -42,6 +45,30 @@ const SOLID = { fill: "currentColor", stroke: "none" } as const;
 
 function glyph(name: IconName): JSX.Element {
   switch (name) {
+    case "gem":
+      return (
+        <>
+          <path
+            d="M7 4h10l4 5-9 11L3 9z"
+            style={{ fill: "var(--c-gem-500)", stroke: "var(--c-gem-700)" }}
+          />
+          <path
+            d="M3 9h18M9 4l3 16M15 4l-3 16"
+            style={{ fill: "none", stroke: "var(--c-gem-700)" }}
+          />
+        </>
+      );
+    case "shop":
+      return (
+        <>
+          <path d="M4 9l1.5-5h13L20 9" />
+          <path d="M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11z" />
+          <path d="M5.5 14v6h13v-6" />
+          <path d="M10 20v-4h4v4" />
+        </>
+      );
+    case "bolt":
+      return <path d="M13 2L4 14h7l-1 8 9-12h-7z" />;
     case "coin":
       return (
         <>

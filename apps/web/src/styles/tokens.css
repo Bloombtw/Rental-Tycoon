@@ -33,6 +33,10 @@
   --c-gold-300: #ffd76a;
   --c-gold-500: #f2b02c;
   --c-gold-700: #b97a0c;
+  /* Premium currency (shop.md) */
+  --c-gem-300: #9be7ff;
+  --c-gem-500: #3fb8f0;
+  --c-gem-700: #1b6fa8;
   --c-neutral-100: #f7f5ec;
   --c-neutral-300: #d9d6c8;
   --c-neutral-500: #8a8ca0;

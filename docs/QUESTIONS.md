@@ -66,3 +66,10 @@ Les questions qui demandent une décision humaine. Le travail ne bloque pas dess
 
 3. **Scène plein écran sous l'UI flottante** (décision 1 de la spec). Change la mise en page de `first-playable` (HUD et feuille ne réduisent plus la scène, ils la recouvrent ; le cadrage tient compte des zones masquées).
    _Recommandation_ : l'adopter (standard des tycoons mobiles). À revoir après les captures avant/après si la feuille ouverte cache trop la ville sur un petit iPhone (SE, 375 × 667).
+
+## shop (boutique en argent réel, mode test)
+
+1. **Passer en paiement réel.** Prérequis côté propriétaire : statut pour vendre (micro-entreprise / SIRET), CGV + mentions légales, case de renonciation au droit de rétractation avant paiement, compte chez le prestataire crypto (NOWPayments ou autre), déploiement du Worker `apps/server/src/payments/worker.ts` (KV `ORDERS` + secrets `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`, `RECEIPT_SIGNING_KEY`, `PUBLIC_URL`, `GAME_ORIGIN`, `GAME_URL`), puis `VITE_PAYMENTS_URL` et `VITE_RECEIPT_PUBLIC_KEY` dans le build.
+   _Recommandation_ : rester en mode test jusque-là ; le jeu livré ne débite rien.
+
+2. **Prix et contenus.** Packs de 0,99 € à 19,99 €, pack de démarrage 2,99 €, boosters en diamants : valeurs indicatives à ajuster.

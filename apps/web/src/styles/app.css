@@ -2157,3 +2157,194 @@ input {
     display: none;
   }
 }
+
+/* -------------------------------------------------------- shop (shop.md) */
+.shop-fab {
+  position: absolute;
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  bottom: var(--space-4);
+  z-index: var(--z-fab);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 6px 8px;
+  border: 1px solid var(--c-glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--g-gold);
+  color: var(--c-ink);
+  box-shadow: var(--elev-3), var(--inset-highlight);
+  font: inherit;
+  font-weight: var(--fw-bold);
+  font-size: 12px;
+  cursor: pointer;
+  animation: pop-in var(--dur-base) var(--ease-spring);
+}
+
+.shop-fab:active {
+  transform: translateY(2px);
+}
+
+.shop-fab-gems {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-fab-boost {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--g-money);
+  color: var(--c-on-dark);
+  box-shadow: var(--elev-2);
+}
+
+.gem-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--c-surface-2);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-card {
+  width: min(100% - 24px, 420px);
+  max-height: calc(100% - 24px);
+  align-items: stretch;
+  padding: var(--space-4) var(--space-3);
+  overflow: hidden;
+}
+
+.shop-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.shop-head h2 {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.shop-test {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--g-gold);
+  color: var(--c-ink);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+
+.shop-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.shop-section {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--c-ink-muted);
+}
+
+.shop-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.shop-product {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--c-surface-2);
+}
+
+.shop-product[data-featured="true"] {
+  background: var(--g-gold);
+  box-shadow: var(--elev-2);
+}
+
+.shop-product-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.shop-product-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.shop-product-info h3,
+.shop-product-info p {
+  margin: 0;
+}
+
+.shop-product-info p {
+  font-size: var(--fs-sm);
+}
+
+.shop-active {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--c-money-strong);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+
+.checkout-card {
+  align-items: stretch;
+  text-align: center;
+}
+
+.coin-choice {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.coin-option {
+  min-width: 72px;
+  min-height: var(--tap);
+  border: 2px solid var(--c-surface-2);
+  border-radius: var(--radius);
+  background: var(--c-surface-2);
+  color: var(--c-ink);
+  font: inherit;
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+}
+
+.coin-option[aria-checked="true"] {
+  border-color: var(--c-gem-500);
+  background: var(--c-surface);
+}
+
+.checkout-hint {
+  margin: 0;
+  color: var(--c-ink-muted);
+  font-size: var(--fs-sm);
+}

@@ -2,14 +2,18 @@ import {
   CAR_MODELS,
   advanceMinutes,
   buyCar,
+  activateBooster,
   buyUpgrade,
   claimDailyReward,
+  grantPurchase,
   createGame,
   fireManager,
   hireManager,
   levelForXp,
   setCarPrice,
+  type BoosterId,
   type ManagerId,
+  type Receipt,
   type UpgradeId,
   type CarId,
   type CarModelId,
@@ -20,8 +24,11 @@ import { formatCents } from "../format.js";
 import { dayBannerText, isSpeed, type Speed } from "./clock.js";
 import {
   CAR_MODEL_LABELS,
+  BOOSTER_LABELS,
+  PURCHASE_FAILED_ERROR,
   MANAGER_LABELS,
   NEW_GAME_NOTICE,
+  purchaseNotice,
   UPGRADE_LABELS,
   errorMessage,
   levelUpNotice,
@@ -56,6 +63,10 @@ export type GameAction =
   | { type: "hireManager"; manager: ManagerId }
   | { type: "fireManager"; manager: ManagerId }
   | { type: "claimDailyReward"; today: number }
+  | { type: "grantPurchase"; receipt: Receipt }
+  | { type: "activateBooster"; booster: BoosterId }
+  /** The live checkout could not start (network, endpoint down). */
+  | { type: "purchaseFailed" }
   | { type: "advanceTime"; minutes: number }
   | { type: "setSpeed"; speed: Speed }
   | { type: "togglePause" }
@@ -139,6 +150,16 @@ function applyAction(game: GameState, action: GameAction): { game: GameState; no
         notice: `Prix de la voiture n°${action.carId} fixé à ${formatCents(applied?.dailyPrice ?? 0)}/jour.`,
       };
     }
+    case "grantPurchase": {
+      const next = grantPurchase(game, action.receipt);
+      if (next === game) return { game, notice: "Achat déjà crédité." };
+      return { game: next, notice: purchaseNotice(action.receipt.productId) };
+    }
+    case "activateBooster":
+      return {
+        game: activateBooster(game, action.booster),
+        notice: `${BOOSTER_LABELS[action.booster]} activé !`,
+      };
     case "claimDailyReward": {
       const next = claimDailyReward(game, action.today);
       return {
@@ -208,6 +229,8 @@ function reduce(state: UiState, action: GameAction): UiState {
       if (!isSeed(seed)) return state;
       return { ...initUiState(createGame(seed)), notice: NEW_GAME_NOTICE };
     }
+    case "purchaseFailed":
+      return { ...state, notice: null, error: PURCHASE_FAILED_ERROR };
     case "returnAfter":
       return returnAfter(state, (action as { elapsedMs?: unknown }).elapsedMs);
     case "claimOffline":
@@ -233,6 +256,8 @@ function reduce(state: UiState, action: GameAction): UiState {
     case "hireManager":
     case "fireManager":
     case "claimDailyReward":
+    case "grantPurchase":
+    case "activateBooster":
       try {
         const result = applyAction(state.game, action);
         return { ...state, game: result.game, error: null, notice: result.notice };

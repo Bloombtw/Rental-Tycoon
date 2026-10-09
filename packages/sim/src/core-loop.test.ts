@@ -760,7 +760,7 @@ describe("tick: revenue", () => {
         "upgrades",
         "xp",
       ]
-        .concat(["managers", "dailyReward"])
+        .concat(["managers", "dailyReward", "shop"])
         .sort(),
     );
     for (const c of t.fleet) {

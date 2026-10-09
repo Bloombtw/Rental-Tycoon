@@ -19,7 +19,10 @@ export type SimErrorCode =
   | "MODEL_LOCKED"
   | "UNKNOWN_MANAGER"
   | "MANAGER_STATE"
-  | "REWARD_ALREADY_CLAIMED";
+  | "REWARD_ALREADY_CLAIMED"
+  | "INVALID_RECEIPT"
+  | "PRODUCT_ALREADY_OWNED"
+  | "BOOSTER_UNAFFORDABLE";
 
 /** Base class of every typed sim error. Extends RangeError for compatibility. */
 export abstract class SimError extends RangeError {
@@ -169,6 +172,41 @@ export class ManagerStateError extends SimError {
     this.name = "ManagerStateError";
     this.manager = manager;
     this.alreadyHired = alreadyHired;
+  }
+}
+
+export class InvalidReceiptError extends SimError {
+  readonly code = "INVALID_RECEIPT" as const;
+  readonly field: string;
+
+  constructor(field: string) {
+    super(`invalid receipt or product (${field})`);
+    this.name = "InvalidReceiptError";
+    this.field = field;
+  }
+}
+
+export class ProductAlreadyOwnedError extends SimError {
+  readonly code = "PRODUCT_ALREADY_OWNED" as const;
+  readonly product: string;
+
+  constructor(product: string) {
+    super("one-time product already owned");
+    this.name = "ProductAlreadyOwnedError";
+    this.product = product;
+  }
+}
+
+export class BoosterUnaffordableError extends SimError {
+  readonly code = "BOOSTER_UNAFFORDABLE" as const;
+  readonly required: number;
+  readonly available: number;
+
+  constructor(required: number, available: number) {
+    super("not enough diamonds");
+    this.name = "BoosterUnaffordableError";
+    this.required = required;
+    this.available = available;
   }
 }
 

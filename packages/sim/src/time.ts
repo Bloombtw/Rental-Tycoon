@@ -11,6 +11,7 @@ import { InvalidMinutesError, SimOverflowError } from "./errors.js";
 import { createRng, type Rng } from "./rng.js";
 import { adsBonusPct, boostedAcceptance, washedReference } from "./upgrades.js";
 import { managedFleet, managersSalary, salesBonusPct } from "./managers.js";
+import { boostDemandPct, revenueMultiplier } from "./shop.js";
 import type { Car, GameState, RentalOutcome } from "./state.js";
 
 /** Opening hours 09:00 -> 21:00, in game minutes. */
@@ -81,7 +82,10 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   const depart = (from: number, to: number): void => {
     if (to <= from) return;
     if (from === 0) {
-      const bonus = adsBonusPct(state.upgrades) + salesBonusPct(state.managers);
+      const bonus =
+        adsBonusPct(state.upgrades) +
+        salesBonusPct(state.managers) +
+        boostDemandPct({ ...state, day });
       const pct = draw().int(DEMAND_MIN_PCT + bonus, DEMAND_MAX_PCT + bonus);
       customersLeft = DEMAND_BASE + Math.round((state.fleet.length * pct) / 100);
       // The pricing manager sets the day's prices before the first customer (managers.md).
@@ -108,8 +112,10 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
       }
       const rented = outcome === "rented";
       if (rented) {
-        cash += car.dailyPrice;
-        todayRevenue += car.dailyPrice;
+        // A revenue booster pays double (shop.md); XP stays on the price.
+        const earned = car.dailyPrice * revenueMultiplier({ ...state, day });
+        cash += earned;
+        todayRevenue += earned;
         if (!Number.isSafeInteger(cash) || !Number.isSafeInteger(todayRevenue)) {
           throw new SimOverflowError("cash");
         }
@@ -151,6 +157,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     xp,
     managers: state.managers,
     dailyReward: state.dailyReward,
+    shop: state.shop,
     fleet: copy ?? state.fleet,
     lastDay,
   };

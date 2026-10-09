@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { NO_DAILY_REWARD, NO_MANAGERS, NO_UPGRADES, type Car, type GameState } from "@rt/sim";
+import {
+  INITIAL_SHOP,
+  NO_DAILY_REWARD,
+  NO_MANAGERS,
+  NO_UPGRADES,
+  type Car,
+  type GameState,
+} from "@rt/sim";
 import { departuresBetween } from "./gains.js";
 
 const car = (over: Partial<Car>): Car => ({
@@ -23,6 +30,7 @@ const state = (day: number, minute: number, fleet: readonly Car[]): GameState =>
   xp: 0,
   managers: NO_MANAGERS,
   dailyReward: NO_DAILY_REWARD,
+  shop: INITIAL_SHOP,
   fleet,
   lastDay: day === 0 ? null : { revenue: 0, costs: 0 },
 });
