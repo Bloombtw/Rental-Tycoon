@@ -73,6 +73,11 @@ export const CAR_TINTS: Readonly<Record<CarAssetKey, readonly number[]>> = Objec
   used: Object.freeze([0x9c8f7a, 0x7d8a8f, 0xa89f91, 0x8c7b6b]),
   compact: Object.freeze([0xe07a5f, 0xf2cc8f, 0x3d9bd1, 0xffffff, 0x81b29a]),
   hybrid: Object.freeze([0xf7f7f2, 0x2f4b7c, 0x1f7a6d, 0x3a3a3a]),
+  suv: Object.freeze([0x4a6fa5, 0xc94f4f, 0xe9e6dc, 0x2e3a2f]),
+  van: Object.freeze([0xffffff, 0xf2c14e, 0x5b7c99]),
+  electric: Object.freeze([0x3dd6c4, 0xf7f7f2, 0x7b6cf6]),
+  sport: Object.freeze([0xe63946, 0xffb703, 0x1d1d1f]),
+  luxury: Object.freeze([0x1d1d1f, 0xd9d4c7, 0x3b2f2f]),
   unknown: Object.freeze([0xb0b0b0]),
 });
 

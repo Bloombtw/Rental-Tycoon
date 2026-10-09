@@ -1,9 +1,10 @@
-import { CAR_MODELS, MAX_CAR_DAILY_PRICE, type CarModelId } from "./economy.js";
+import { CAR_MODELS, levelForXp, MAX_CAR_DAILY_PRICE, type CarModelId } from "./economy.js";
 import { fleetCapacity } from "./upgrades.js";
 import {
   FleetFullError,
   InsufficientCashError,
   InvalidPriceError,
+  ModelLockedError,
   SimOverflowError,
   UnknownCarError,
   UnknownCarModelError,
@@ -16,6 +17,7 @@ export function buyCar(state: GameState, model: CarModelId): GameState {
     throw new UnknownCarModelError(model);
   }
   const spec = CAR_MODELS[model];
+  if (levelForXp(state.xp) < spec.unlockLevel) throw new ModelLockedError(model, spec.unlockLevel);
   const capacity = fleetCapacity(state.upgrades);
   if (state.fleet.length >= capacity) throw new FleetFullError(capacity);
   if (!Number.isSafeInteger(state.cash)) throw new SimOverflowError("cash");

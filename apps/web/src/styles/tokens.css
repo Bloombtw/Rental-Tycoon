@@ -51,6 +51,11 @@
   --c-model-used: #8d99a6;
   --c-model-compact: #4f9fe0;
   --c-model-hybrid: #3dbb8c;
+  --c-model-suv: #4a6fa5;
+  --c-model-van: #f2c14e;
+  --c-model-electric: #3dd6c4;
+  --c-model-sport: #e63946;
+  --c-model-luxury: #3b3b44;
 
   /* Translucent tints, no blur (backdrop-filter over the 3D canvas is too costly). */
   --glass-dark: rgb(27 29 46 / 0.8);

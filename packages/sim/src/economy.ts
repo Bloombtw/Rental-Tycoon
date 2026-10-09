@@ -6,43 +6,73 @@ export const MAX_CAR_DAILY_COST: Cents = 1_000_00;
 export const MAX_FLEET_SIZE = 50;
 export const MAX_ADVANCE_DAYS = 3_650;
 
-export type CarModelId = "used" | "compact" | "hybrid";
+export type CarModelId =
+  "used" | "compact" | "hybrid" | "suv" | "van" | "electric" | "sport" | "luxury";
 
 export interface CarModel {
   readonly id: CarModelId;
   readonly purchasePrice: Cents;
   readonly dailyCost: Cents;
   readonly defaultDailyPrice: Cents;
+  /** Agency level that unlocks the model (agency-level.md). */
+  readonly unlockLevel: number;
 }
 
-/** Canonical display order. */
+/** Canonical display order (also the unlock order). */
 export const CAR_MODEL_IDS: readonly CarModelId[] = Object.freeze([
   "used",
   "compact",
   "hybrid",
+  "suv",
+  "van",
+  "electric",
+  "sport",
+  "luxury",
 ] as const);
+
+const model = (
+  id: CarModelId,
+  purchasePrice: Cents,
+  dailyCost: Cents,
+  defaultDailyPrice: Cents,
+  unlockLevel: number,
+): CarModel => Object.freeze({ id, purchasePrice, dailyCost, defaultDailyPrice, unlockLevel });
 
 /** Tunable placeholders. Deep-frozen. */
 export const CAR_MODELS: Readonly<Record<CarModelId, CarModel>> = Object.freeze({
-  used: Object.freeze({
-    id: "used",
-    purchasePrice: 4_000_00,
-    dailyCost: 60_00,
-    defaultDailyPrice: 90_00,
-  }),
-  compact: Object.freeze({
-    id: "compact",
-    purchasePrice: 9_000_00,
-    dailyCost: 25_00,
-    defaultDailyPrice: 60_00,
-  }),
-  hybrid: Object.freeze({
-    id: "hybrid",
-    purchasePrice: 16_000_00,
-    dailyCost: 10_00,
-    defaultDailyPrice: 120_00,
-  }),
-} as const satisfies Record<CarModelId, CarModel>);
+  used: model("used", 4_000_00, 60_00, 90_00, 1),
+  compact: model("compact", 9_000_00, 25_00, 60_00, 1),
+  hybrid: model("hybrid", 16_000_00, 10_00, 120_00, 1),
+  suv: model("suv", 22_000_00, 30_00, 150_00, 2),
+  van: model("van", 18_000_00, 35_00, 140_00, 3),
+  electric: model("electric", 28_000_00, 8_00, 160_00, 4),
+  sport: model("sport", 45_000_00, 50_00, 260_00, 5),
+  luxury: model("luxury", 70_000_00, 60_00, 380_00, 6),
+} satisfies Record<CarModelId, CarModel>);
+
+/* ------------------------------------------------------------------ agency level (agency-level.md) */
+
+export const MAX_AGENCY_LEVEL = 10;
+/** Total XP needed to reach level n (index n − 1); level 1 is free. 1 XP per euro of rental revenue. */
+export const LEVEL_XP: readonly number[] = Object.freeze([
+  0, 1_500, 4_000, 9_000, 18_000, 35_000, 60_000, 100_000, 160_000, 250_000,
+]);
+
+/** Agency level for a total XP (1..MAX_AGENCY_LEVEL). Garbage gives 1. */
+export function levelForXp(xp: unknown): number {
+  if (typeof xp !== "number" || !Number.isFinite(xp) || xp <= 0) return 1;
+  let level = 1;
+  for (let n = 2; n <= MAX_AGENCY_LEVEL; n++) {
+    const need = LEVEL_XP[n - 1];
+    if (need !== undefined && xp >= need) level = n;
+  }
+  return level;
+}
+
+/** XP earned by renting a car at `dailyPrice`: one per whole euro. */
+export function rentalXp(dailyPrice: Cents): number {
+  return Number.isSafeInteger(dailyPrice) && dailyPrice > 0 ? Math.floor(dailyPrice / 100) : 0;
+}
 
 /* ------------------------------------------------------------------ demand (random-demand.md) */
 

@@ -15,7 +15,8 @@ export type SimErrorCode =
   | "INVALID_GAME_STATE"
   | "UNSUPPORTED_STATE_VERSION"
   | "UNKNOWN_UPGRADE"
-  | "UPGRADE_MAXED";
+  | "UPGRADE_MAXED"
+  | "MODEL_LOCKED";
 
 /** Base class of every typed sim error. Extends RangeError for compatibility. */
 export abstract class SimError extends RangeError {
@@ -140,6 +141,19 @@ export class FleetFullError extends SimError {
     super("the fleet is full");
     this.name = "FleetFullError";
     this.maxFleetSize = maxFleetSize;
+  }
+}
+
+export class ModelLockedError extends SimError {
+  readonly code = "MODEL_LOCKED" as const;
+  readonly model: string;
+  readonly requiredLevel: number;
+
+  constructor(model: string, requiredLevel: number) {
+    super("this car model is not unlocked yet");
+    this.name = "ModelLockedError";
+    this.model = model;
+    this.requiredLevel = requiredLevel;
   }
 }
 

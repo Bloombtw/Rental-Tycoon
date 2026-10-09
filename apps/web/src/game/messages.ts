@@ -1,9 +1,12 @@
 import {
+  CAR_MODELS,
+  CAR_MODEL_IDS,
   FleetFullError,
   InsufficientCashError,
   InvalidPriceError,
   MAX_CAR_DAILY_PRICE,
   MAX_FLEET_SIZE,
+  ModelLockedError,
   SimOverflowError,
   UnknownCarError,
   UnknownCarModelError,
@@ -18,6 +21,11 @@ export const CAR_MODEL_LABELS: Readonly<Record<CarModelId, string>> = Object.fre
   used: "Citadine d'occasion",
   compact: "Citadine neuve",
   hybrid: "Berline hybride",
+  suv: "SUV familial",
+  van: "Utilitaire",
+  electric: "Citadine électrique",
+  sport: "Coupé sport",
+  luxury: "SUV de luxe",
 });
 
 export const UPGRADE_LABELS: Readonly<Record<UpgradeId, string>> = Object.freeze({
@@ -26,6 +34,15 @@ export const UPGRADE_LABELS: Readonly<Record<UpgradeId, string>> = Object.freeze
   ads: "Publicité",
   wash: "Station de lavage",
 });
+
+/** Level-up message: the models it unlocks (agency-level.md). */
+export function levelUpNotice(level: number): string {
+  const models = CAR_MODEL_IDS.filter((id) => CAR_MODELS[id].unlockLevel === level).map(
+    (id) => CAR_MODEL_LABELS[id],
+  );
+  const unlock = models.length > 0 ? ` Nouveau modèle : ${models.join(", ")}.` : "";
+  return `Niveau ${String(level)} atteint !${unlock}`;
+}
 
 /** Status label of a car: why it stayed at the lot at its last slot, when known. */
 export function carStatusLabel(car: {
@@ -74,6 +91,10 @@ export function errorMessage(error: unknown): string {
         return `Parking plein : ${String(max)} places. Agrandissez le parking.`;
       }
       return `Flotte complète : ${max === null ? "—" : String(max)} voitures maximum.`;
+    }
+    if (error instanceof ModelLockedError) {
+      const lvl = Number.isSafeInteger(error.requiredLevel) ? String(error.requiredLevel) : "—";
+      return `Modèle verrouillé : atteignez le niveau ${lvl} de l'agence.`;
     }
     if (error instanceof UpgradeMaxedError) return "Cette amélioration est déjà au niveau maximum.";
     if (error instanceof UnknownUpgradeError) return "Amélioration inconnue.";

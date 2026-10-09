@@ -206,7 +206,9 @@ describe("CAR_TINTS", () => {
   });
 
   it("every list is non-empty and holds valid colours", () => {
-    expect(Object.keys(CAR_TINTS).sort()).toEqual(["compact", "hybrid", "unknown", "used"]);
+    expect(Object.keys(CAR_TINTS).sort()).toEqual(
+      ["compact", "electric", "hybrid", "luxury", "sport", "suv", "unknown", "used", "van"].sort(),
+    );
     for (const list of Object.values(CAR_TINTS)) {
       expect(list.length).toBeGreaterThan(0);
       for (const c of list) expect(isColor(c)).toBe(true);

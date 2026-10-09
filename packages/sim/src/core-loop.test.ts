@@ -757,6 +757,7 @@ describe("tick: revenue", () => {
       "seed",
       "todayRevenue",
       "upgrades",
+      "xp",
     ]);
     for (const c of t.fleet) {
       expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "outcome", "rented"]);

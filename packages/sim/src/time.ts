@@ -5,6 +5,7 @@ import {
   DEMAND_MIN_PCT,
   MAX_FLEET_SIZE,
   referencePrice,
+  rentalXp,
 } from "./economy.js";
 import { InvalidMinutesError, SimOverflowError } from "./errors.js";
 import { createRng, type Rng } from "./rng.js";
@@ -69,6 +70,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   let lastDay = state.lastDay;
   const left = state.customersLeft;
   let customersLeft = typeof left === "number" && Number.isSafeInteger(left) && left > 0 ? left : 0;
+  let xp = Number.isSafeInteger(state.xp) && state.xp > 0 ? state.xp : 0;
   let copy: Car[] | null = null;
   // Created on first draw only, so a span without random events leaves rngState untouched.
   const lazy: { rng: Rng | null } = { rng: null };
@@ -106,6 +108,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
         if (!Number.isSafeInteger(cash) || !Number.isSafeInteger(todayRevenue)) {
           throw new SimOverflowError("cash");
         }
+        xp += rentalXp(car.dailyPrice); // agency experience (agency-level.md)
       }
       const current = copy?.[i] ?? car;
       if (current.rented !== rented || current.outcome !== outcome) {
@@ -141,6 +144,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     todayRevenue,
     customersLeft,
     upgrades: state.upgrades,
+    xp,
     fleet: copy ?? state.fleet,
     lastDay,
   };

@@ -253,7 +253,8 @@ export function Icon({ name, size = 24, className }: IconProps): JSX.Element {
   );
 }
 
-export type CarTint = "used" | "compact" | "hybrid" | "unknown";
+export type CarTint =
+  "used" | "compact" | "hybrid" | "suv" | "van" | "electric" | "sport" | "luxury" | "unknown";
 
 /**
  * A drawn three-quarter car (160 x 120), nose to the left like the 3D thumbnails. The body colour

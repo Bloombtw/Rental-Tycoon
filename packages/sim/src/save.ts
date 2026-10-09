@@ -29,7 +29,7 @@ import {
 } from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 3;
+export const GAME_STATE_VERSION = 4;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -180,6 +180,7 @@ function parse(raw: unknown): GameState {
   if (fleet.length > fleetCapacity(upgrades)) {
     throw new InvalidGameStateError("upgrades.parking", "inconsistent");
   }
+  const xp = int(own(raw, "xp"), "xp", 0, Number.MAX_SAFE_INTEGER);
 
   return {
     seed,
@@ -190,9 +191,15 @@ function parse(raw: unknown): GameState {
     todayRevenue,
     customersLeft,
     upgrades,
+    xp,
     fleet,
     lastDay,
   };
+}
+
+/** v3 → v4: adds `xp` (a fresh agency: level 1, the first three models stay buyable). */
+function migrateV3(raw: unknown): unknown {
+  return isRecord(raw) ? { ...raw, xp: 0 } : raw;
 }
 
 /** v2 → v3: adds `upgrades`, with a parking that holds the fleet. */
@@ -240,6 +247,7 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
   try {
     if (stateVersion < 2) data = migrateV1(data);
     if (stateVersion < 3) data = migrateV2(data);
+    if (stateVersion < 4) data = migrateV3(data);
   } catch {
     throw new InvalidGameStateError("$", "type");
   }
