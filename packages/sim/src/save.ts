@@ -1,17 +1,25 @@
 import {
   CAR_MODELS,
   CAR_MODEL_IDS,
+  DEMAND_BASE,
+  DEMAND_MAX_PCT,
   MAX_CAR_DAILY_COST,
   MAX_CAR_DAILY_PRICE,
   MAX_FLEET_SIZE,
   type CarModelId,
 } from "./economy.js";
 import { SimError } from "./errors.js";
-import type { Car, DayReport, GameState } from "./state.js";
+import {
+  RENTAL_OUTCOMES,
+  type Car,
+  type DayReport,
+  type GameState,
+  type RentalOutcome,
+} from "./state.js";
 import { DAY_MINUTES } from "./time.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 1;
+export const GAME_STATE_VERSION = 2;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -89,10 +97,26 @@ function parseCar(raw: unknown, index: number, seen: Set<number>): Car {
   const rented = own(raw, "rented");
   if (typeof rented !== "boolean") throw new InvalidGameStateError(`${p}.rented`, "type");
 
-  return model === undefined
-    ? { id, dailyPrice, dailyCost, rented }
-    : { id, model, dailyPrice, dailyCost, rented };
+  let outcome: RentalOutcome | undefined;
+  if (hasOwn(raw, "outcome")) {
+    const o = own(raw, "outcome");
+    if (typeof o !== "string") throw new InvalidGameStateError(`${p}.outcome`, "type");
+    outcome = RENTAL_OUTCOMES.find((candidate) => candidate === o);
+    if (outcome === undefined) throw new InvalidGameStateError(`${p}.outcome`, "range");
+    if ((outcome === "rented") !== rented) {
+      throw new InvalidGameStateError(`${p}.outcome`, "inconsistent");
+    }
+  }
+
+  const car: Car =
+    model === undefined
+      ? { id, dailyPrice, dailyCost, rented }
+      : { id, model, dailyPrice, dailyCost, rented };
+  return outcome === undefined ? car : { ...car, outcome };
 }
+
+/** Most customers a day can draw (full fleet, top of the demand range). */
+const MAX_CUSTOMERS = DEMAND_BASE + Math.round((MAX_FLEET_SIZE * DEMAND_MAX_PCT) / 100);
 
 function parse(raw: unknown): GameState {
   if (!isRecord(raw)) throw new InvalidGameStateError("$", "type");
@@ -105,6 +129,7 @@ function parse(raw: unknown): GameState {
   if (minute === 0 && todayRevenue !== 0) {
     throw new InvalidGameStateError("todayRevenue", "inconsistent");
   }
+  const customersLeft = int(own(raw, "customersLeft"), "customersLeft", 0, MAX_CUSTOMERS);
 
   const rawFleet = own(raw, "fleet");
   if (!Array.isArray(rawFleet)) throw new InvalidGameStateError("fleet", "type");
@@ -130,7 +155,15 @@ function parse(raw: unknown): GameState {
   if ((lastDay === null) !== (day === 0))
     throw new InvalidGameStateError("lastDay", "inconsistent");
 
-  return { seed, rngState, day, minute, cash, todayRevenue, fleet, lastDay };
+  return { seed, rngState, day, minute, cash, todayRevenue, customersLeft, fleet, lastDay };
+}
+
+/** v1 → v2: adds `customersLeft` (generous: one per car for the rest of the day). */
+function migrateV1(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const fleet = own(raw, "fleet");
+  const count = Array.isArray(fleet) ? Math.min(fleet.length, MAX_CUSTOMERS) : 0;
+  return { ...raw, customersLeft: count };
 }
 
 /** Pure. Returns a fresh, normalised copy (known fields only) or throws InvalidGameStateError. */
@@ -158,6 +191,13 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
       stateVersion > GAME_STATE_VERSION;
     throw new UnsupportedGameStateVersionError(stateVersion, newer);
   }
-  // Migrations v -> v+1 go here (none in v1).
-  return validateGameState(raw);
+  let data = raw;
+  if (stateVersion < 2) {
+    try {
+      data = migrateV1(data);
+    } catch {
+      throw new InvalidGameStateError("$", "type");
+    }
+  }
+  return validateGameState(data);
 }

@@ -20,7 +20,17 @@ export interface Car {
   readonly dailyCost: Cents;
   /** Rented at its last departure slot. */
   readonly rented: boolean;
+  /** What happened at its last departure slot; absent before its first slot. */
+  readonly outcome?: RentalOutcome;
 }
+
+export type RentalOutcome = "rented" | "tooExpensive" | "noCustomer";
+
+export const RENTAL_OUTCOMES: readonly RentalOutcome[] = Object.freeze([
+  "rented",
+  "tooExpensive",
+  "noCustomer",
+] as const);
 
 export interface NewCar {
   readonly dailyPrice: Cents;
@@ -37,6 +47,8 @@ export interface GameState {
   readonly cash: Cents;
   /** Revenue collected since opening (already in cash). */
   readonly todayRevenue: Cents;
+  /** Customers still to come today (drawn at opening). */
+  readonly customersLeft: number;
   readonly fleet: readonly Car[];
   /** Report of the last closed day; null before the first closing. */
   readonly lastDay: DayReport | null;
@@ -93,6 +105,7 @@ export function createGame(
     minute: 0,
     cash: startingCash,
     todayRevenue: 0,
+    customersLeft: 0, // drawn when minute 0 is processed
     fleet: cars,
     lastDay: null,
   };

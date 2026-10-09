@@ -1,6 +1,6 @@
 import type { Car, Cents } from "@rt/sim";
 import { formatCents } from "../format.js";
-import { CAR_MODEL_LABELS } from "../game/messages.js";
+import { CAR_MODEL_LABELS, carStatusLabel } from "../game/messages.js";
 import { CarThumbnail } from "../ui/CarThumbnail.js";
 import { Icon } from "../ui/icons.js";
 import { usePop } from "../ui/usePop.js";
@@ -37,7 +37,7 @@ export function CarRow({ car, onSetPrice }: CarRowProps) {
             title="Statut du dernier jour simulé"
           >
             <Icon name={car.rented ? "key" : "parking"} size={16} />
-            {car.rented ? "Louée" : "Au parking"}
+            {carStatusLabel(car)}
           </span>
         </div>
       </div>

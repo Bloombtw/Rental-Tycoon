@@ -8,7 +8,6 @@ import {
   DEPARTURE_STAGGER_MINUTES,
   departureMinute,
   InvalidMinutesError,
-  MAX_ACCEPTED_DAILY_PRICE,
   MAX_ADVANCE_MINUTES,
   MAX_FLEET_SIZE,
   RENTAL_MINUTES,
@@ -32,7 +31,20 @@ function fleetOf(n: number, car: NewCar = P60): NewCar[] {
   return Array.from({ length: n }, () => car);
 }
 
-/** Cars cycle through 60, 90, 200 (unrentable), 150 (limit). */
+/** Sum of the prices of the cars rented in this fleet snapshot. */
+function revenueOf(fleet: readonly Car[]): number {
+  return fleet.reduce((s, c) => s + (c.rented ? c.dailyPrice : 0), 0);
+}
+
+/** First seed whose run of `minutes` from a fresh game satisfies `pred`. */
+function findSeed(fleet: NewCar[], minutes: number, pred: (s: GameState) => boolean): number {
+  for (let seed = 1; seed < 500; seed++) {
+    if (pred(advanceMinutes(createGame(seed, CASH, fleet), minutes))) return seed;
+  }
+  throw new Error("no seed found");
+}
+
+/** Cars cycle through 60, 90, 200 (never rented: >= 2x the 90 reference), 150, 150.01. */
 function mixed(n: number): NewCar[] {
   const prices = [60_00, 90_00, 200_00, 150_00, 150_01];
   return Array.from({ length: n }, (_, i) => ({
@@ -231,28 +243,34 @@ describe("slot boundaries", () => {
     const g2 = at(g0, 2);
     expect(g2.minute).toBe(2);
     expect(g2.fleet[1]?.rented).toBe(false);
-    expect(g2.cash).toBe(CASH + 60_00); // car 0 only (minute 0 processed)
-    expect(g2.todayRevenue).toBe(60_00);
+    expect(g2.fleet[1]?.outcome).toBeUndefined();
+    expect(g2.fleet[0]?.outcome).toBeDefined(); // car 0 only (minute 0 processed)
+    expect(g2.cash).toBe(CASH + revenueOf(g2.fleet.slice(0, 1)));
+    expect(g2.todayRevenue).toBe(revenueOf(g2.fleet.slice(0, 1)));
   });
 
   it("advancing to a+1 fires the event at a", () => {
     const g3 = at(g0, 3);
-    expect(g3.fleet[1]?.rented).toBe(true);
-    expect(g3.cash).toBe(CASH + 120_00);
-    expect(g3.todayRevenue).toBe(120_00);
+    expect(g3.fleet[1]?.outcome).toBeDefined();
+    expect(g3.fleet[2]?.outcome).toBeUndefined();
+    expect(g3.cash).toBe(CASH + revenueOf(g3.fleet));
+    expect(g3.todayRevenue).toBe(revenueOf(g3.fleet));
   });
 
   it("from minute 2, advancing 1 fires car 1 (minute 2); from 3, advancing 1 fires nothing", () => {
     const g2 = at(g0, 2);
-    expect(advanceMinutes(g2, 1).cash).toBe(CASH + 120_00);
+    expect(advanceMinutes(g2, 1)).toEqual(at(g0, 3));
     const g3 = at(g0, 3);
     expect(advanceMinutes(g3, 1).cash).toBe(g3.cash);
+    expect(advanceMinutes(g3, 1).fleet).toEqual(g3.fleet);
   });
 
   it("the first minute fires car 0 at 09:00 sharp", () => {
-    expect(advanceMinutes(g0, 1).cash).toBe(CASH + 60_00);
-    expect(advanceMinutes(g0, 1).fleet[0]?.rented).toBe(true);
+    const g1 = advanceMinutes(g0, 1);
+    expect(g1.fleet[0]?.outcome).toBeDefined();
+    expect(g1.cash).toBe(CASH + (g1.fleet[0]?.rented ? 60_00 : 0));
     expect(g0.fleet[0]?.rented).toBe(false);
+    expect(g0.fleet[0]?.outcome).toBeUndefined();
   });
 
   it("each car fires exactly once per day at its own slot", () => {
@@ -262,10 +280,16 @@ describe("slot boundaries", () => {
       const next = advanceMinutes(prev, 1);
       const fired = next.cash - prev.cash;
       // processed minute is m - 1: a car departs on even minutes 0..98
-      expect(fired).toBe((m - 1) % 2 === 0 ? 60_00 : 0);
+      if ((m - 1) % 2 === 0) {
+        expect([0, 60_00]).toContain(fired);
+        expect(next.fleet[(m - 1) / 2]?.outcome).toBeDefined();
+      } else {
+        expect(fired).toBe(0);
+      }
       prev = next;
     }
-    expect(prev.cash).toBe(CASH + 50 * 60_00);
+    expect(prev.fleet.every((c) => c.outcome !== undefined)).toBe(true);
+    expect(prev.cash).toBe(CASH + revenueOf(prev.fleet));
   });
 
   it("a car whose index is >= 50 (corrupt fleet) is never rented", () => {
@@ -278,9 +302,9 @@ describe("slot boundaries", () => {
     }));
     const g: GameState = { ...base, fleet: extra };
     const t = tick(g);
-    expect(t.fleet.slice(0, 50).every((c) => c.rented)).toBe(true);
-    expect(t.fleet.slice(50).every((c) => !c.rented)).toBe(true);
-    expect(t.lastDay).toEqual({ revenue: 50 * 60_00, costs: 52 * 1_00 });
+    expect(t.fleet.slice(0, 50).every((c) => c.outcome !== undefined)).toBe(true);
+    expect(t.fleet.slice(50).every((c) => !c.rented && c.outcome === undefined)).toBe(true);
+    expect(t.lastDay).toEqual({ revenue: revenueOf(t.fleet), costs: 52 * 1_00 });
   });
 });
 
@@ -290,31 +314,52 @@ describe("live cash, todayRevenue and closing", () => {
 
   it("cash rises at departures; no cost is taken before closing", () => {
     const g = at(g0, 719);
-    expect(g.cash).toBe(CASH + 150_00);
-    expect(g.todayRevenue).toBe(150_00);
+    const rev = revenueOf(g.fleet);
+    expect(g.cash).toBe(CASH + rev);
+    expect(g.todayRevenue).toBe(rev);
     expect(g.day).toBe(0);
     expect(g.lastDay).toBeNull();
   });
 
   it("costs are taken at 720 along with the day change", () => {
-    const g = advanceMinutes(at(g0, 719), 1);
-    expect(g.cash).toBe(CASH + 150_00 - 95_00);
+    const before = at(g0, 719);
+    const rev = revenueOf(before.fleet);
+    const g = advanceMinutes(before, 1);
+    expect(g.cash).toBe(CASH + rev - 95_00);
     expect(g.day).toBe(1);
     expect(g.minute).toBe(0);
     expect(g.todayRevenue).toBe(0);
-    expect(g.lastDay).toEqual({ revenue: 150_00, costs: 95_00 });
+    expect(g.lastDay).toEqual({ revenue: rev, costs: 95_00 });
   });
 
   it("lastDay.revenue counts only rented cars; costs count every car", () => {
     const t = advanceMinutes(g0, 720);
-    expect(t.lastDay).toEqual({ revenue: 60_00 + 90_00, costs: 25_00 + 40_00 + 30_00 });
-    expect(t.fleet.map((c) => c.rented)).toEqual([true, true, false]);
+    expect(t.lastDay).toEqual({ revenue: revenueOf(t.fleet), costs: 25_00 + 40_00 + 30_00 });
+    // 200,00 is >= 2x the 90,00 fixture reference: never rented
+    expect(t.fleet[2]?.rented).toBe(false);
+    expect(t.fleet[2]?.outcome).toBe("tooExpensive");
   });
 
-  it("the 150,00 limit is accepted, 150,01 is not", () => {
+  it("a car at 2x the reference or more is never rented, whatever the seed", () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const t = tick(createGame(seed, CASH, [P200, { dailyPrice: 180_00, dailyCost: 1_00 }]));
+      expect(t.fleet.map((c) => c.rented)).toEqual([false, false]);
+      expect(t.lastDay?.revenue).toBe(0);
+    }
+  });
+
+  it("odd prices near the old 150,00 limit follow the random acceptance, not a threshold", () => {
     const t = tick(createGame(1, CASH, mixed(5)));
-    expect(t.fleet.map((c) => c.rented)).toEqual([true, true, false, true, false]);
-    expect(MAX_ACCEPTED_DAILY_PRICE).toBe(150_00);
+    expect(t.fleet[2]?.rented).toBe(false);
+    expect(t.lastDay?.revenue).toBe(revenueOf(t.fleet));
+    // 150,00 and 150,01 are both rentable for some seed
+    for (const idx of [3, 4]) {
+      const seen = new Set<boolean>();
+      for (let seed = 1; seed <= 60; seed++) {
+        seen.add(tick(createGame(seed, CASH, mixed(5))).fleet[idx]?.rented ?? false);
+      }
+      expect(seen).toEqual(new Set([true, false]));
+    }
   });
 
   it("an empty fleet pays nothing and still changes day", () => {
@@ -331,12 +376,16 @@ describe("live cash, todayRevenue and closing", () => {
   });
 
   it("rented flips back to false at the slot when the price became unrentable", () => {
-    const d1 = tick(createGame(1, CASH, [P60]));
+    const seed = findSeed([P60], DAY_MINUTES, (s) => s.fleet[0]?.rented === true);
+    const d1 = tick(createGame(seed, CASH, [P60]));
     expect(d1.fleet[0]?.rented).toBe(true);
+    expect(d1.fleet[0]?.outcome).toBe("rented");
     const pricey = setCarPrice(d1, 1, 200_00);
     // before the slot the value still describes yesterday
     expect(pricey.fleet[0]?.rented).toBe(true);
-    expect(advanceMinutes(pricey, 1).fleet[0]?.rented).toBe(false);
+    const after = advanceMinutes(pricey, 1);
+    expect(after.fleet[0]?.rented).toBe(false);
+    expect(after.fleet[0]?.outcome).toBe("tooExpensive");
   });
 
   it("minute and day advance modulo the day length", () => {
@@ -354,29 +403,44 @@ describe("live cash, todayRevenue and closing", () => {
     const g = advanceMinutes(mid, 720); // 20 min to close, then 700 into day 1
     expect(g.day).toBe(1);
     expect(g.minute).toBe(700);
-    expect(g.todayRevenue).toBe(150_00);
-    expect(g.lastDay).toEqual({ revenue: 150_00, costs: 95_00 });
-    expect(g.cash).toBe(CASH + 150_00 - 95_00 + 150_00);
+    expect(g.todayRevenue).toBe(revenueOf(g.fleet));
+    expect(g.lastDay).toEqual({ revenue: revenueOf(mid.fleet), costs: 95_00 });
+    expect(g.cash).toBe(CASH + revenueOf(mid.fleet) - 95_00 + revenueOf(g.fleet));
   });
 
-  it("seed and rngState are untouched", () => {
+  it("seed is untouched; rngState is a deterministic function of the state", () => {
     const g = { ...createGame(7, CASH, fleet), rngState: 12345 };
     const t = advanceMinutes(g, 720);
     expect(t.seed).toBe(7);
-    expect(t.rngState).toBe(12345);
+    expect(Number.isInteger(t.rngState)).toBe(true);
+    expect(t.rngState).not.toBe(12345); // the day's draws consumed the stream
+    expect(advanceMinutes(g, 720)).toEqual(t);
   });
 
-  it("tick from minute 0 matches the pre-spec end-of-day formula", () => {
+  it("without any random event the rngState does not move", () => {
+    const g = at(createGame(7, CASH, fleet), 10); // all slots done, minute 0 already processed
+    expect(advanceMinutes(g, 100).rngState).toBe(g.rngState);
+  });
+
+  it("tick from minute 0: cash = start + rented prices - costs", () => {
     const f = mixed(13);
     const g = createGame(1, CASH, f);
-    const revenue = f.filter((c) => c.dailyPrice <= 150_00).reduce((s, c) => s + c.dailyPrice, 0);
     const costs = f.reduce((s, c) => s + c.dailyCost, 0);
     const t = tick(g);
+    const revenue = revenueOf(t.fleet);
     expect(t.cash).toBe(CASH + revenue - costs);
     expect(t.day).toBe(1);
     expect(t.minute).toBe(0);
     expect(t.lastDay).toEqual({ revenue, costs });
-    expect(advance(g, 5).cash).toBe(CASH + 5 * (revenue - costs));
+    // five days: sum the per-day reports
+    let s = g;
+    let net = 0;
+    for (let d = 0; d < 5; d++) {
+      s = tick(s);
+      net += (s.lastDay?.revenue ?? NaN) - (s.lastDay?.costs ?? NaN);
+    }
+    expect(advance(g, 5)).toEqual(s);
+    expect(s.cash).toBe(CASH + net);
   });
 
   it("tick from mid-day equals advancing the remaining minutes", () => {
@@ -459,29 +523,32 @@ describe("buying and pricing during the day", () => {
     expect(g.fleet[20]?.rented).toBe(false);
     const before = g.cash;
     const after = advanceMinutes(g, 11); // processes 30..40
-    expect(after.fleet[20]?.rented).toBe(true);
-    expect(after.cash).toBeGreaterThanOrEqual(before + 60_00);
+    expect(after.fleet[20]?.outcome).toBeDefined(); // it had its slot today
+    expect(after.cash - before).toBe(revenueOf(after.fleet) - revenueOf(g.fleet));
   });
 
   it("bought at the very minute of its slot (40): still leaves the same day", () => {
     const g = buyCar(withTwentyCars(40), "compact");
-    expect(advanceMinutes(g, 1).fleet[20]?.rented).toBe(true);
+    expect(g.fleet[20]?.outcome).toBeUndefined();
+    expect(advanceMinutes(g, 1).fleet[20]?.outcome).toBeDefined();
   });
 
   it("bought one minute after its slot (41): waits for tomorrow", () => {
     const g = buyCar(withTwentyCars(41), "compact");
     const closed = advanceMinutes(g, DAY_MINUTES - 41);
     expect(closed.fleet[20]?.rented).toBe(false);
+    expect(closed.fleet[20]?.outcome).toBeUndefined();
     expect(closed.lastDay?.costs).toBe(20 * 25_00 + 25_00); // pays the whole day
     const nextMorning = advanceMinutes(closed, 41);
-    expect(nextMorning.fleet[20]?.rented).toBe(true);
+    expect(nextMorning.fleet[20]?.outcome).toBeDefined();
   });
 
   it("bought at 11:00 (minute 120): waits for tomorrow", () => {
     const g = buyCar(withTwentyCars(120), "compact");
     const closed = advanceMinutes(g, 600);
     expect(closed.fleet[20]?.rented).toBe(false);
-    expect(closed.lastDay?.revenue).toBe(20 * 60_00);
+    expect(closed.fleet[20]?.outcome).toBeUndefined();
+    expect(closed.lastDay?.revenue).toBe(revenueOf(closed.fleet.slice(0, 20)));
   });
 
   it("buyCar keeps minute and todayRevenue and spends cash immediately", () => {
@@ -501,8 +568,10 @@ describe("buying and pricing during the day", () => {
   it("a price raised to 200 before the slot blocks today's rental", () => {
     const g = setCarPrice(createGame(1, CASH, fleetOf(3)), 2, 200_00); // id 2 = index 1
     const t = advanceMinutes(g, 720);
-    expect(t.fleet.map((c) => c.rented)).toEqual([true, false, true]);
-    expect(t.lastDay?.revenue).toBe(120_00);
+    expect(t.fleet[1]?.rented).toBe(false);
+    expect(t.fleet[1]?.outcome).toBe("tooExpensive");
+    expect(t.lastDay?.revenue).toBe(revenueOf(t.fleet));
+    expect(t.lastDay?.revenue).toBeLessThanOrEqual(120_00);
   });
 
   it("the same raise applied after the slot only counts tomorrow", () => {
@@ -510,12 +579,16 @@ describe("buying and pricing during the day", () => {
     const g = at(createGame(1, CASH, fleetOf(3)), 3);
     const late = setCarPrice(g, 2, 200_00);
     const closed = advanceMinutes(late, 717);
-    expect(closed.fleet[1]?.rented).toBe(true);
-    expect(closed.lastDay?.revenue).toBe(3 * 60_00);
+    expect(closed.fleet[1]).toEqual({ ...g.fleet[1], dailyPrice: 200_00 }); // today's outcome kept
+    expect(closed.lastDay?.revenue).toBe(
+      revenueOf(closed.fleet.map((c, i) => (i === 1 ? { ...c, dailyPrice: 60_00 } : c))),
+    );
     expect(advanceMinutes(closed, 720).fleet[1]?.rented).toBe(false);
     // the car whose slot is still ahead is blocked today
     const early = setCarPrice(g, 3, 200_00);
-    expect(advanceMinutes(early, 717).lastDay?.revenue).toBe(2 * 60_00);
+    const earlyClosed = advanceMinutes(early, 717);
+    expect(earlyClosed.fleet[2]?.rented).toBe(false);
+    expect(earlyClosed.fleet[2]?.outcome).toBe("tooExpensive");
   });
 
   it("setCarPrice keeps minute and todayRevenue", () => {
@@ -529,7 +602,8 @@ describe("buying and pricing during the day", () => {
 
 describe("overflow mid-day", () => {
   it("the second departure overflows", () => {
-    const g = deepFreeze(createGame(1, Number.MAX_SAFE_INTEGER - 60_00, [P60, P60]));
+    const seed = findSeed([P60, P60], 3, (s) => s.fleet.every((c) => c.rented));
+    const g = deepFreeze(createGame(seed, Number.MAX_SAFE_INTEGER - 60_00, [P60, P60]));
     const copy = clone(g);
     expectOverflow(() => advanceMinutes(g, 720), "cash");
     expectOverflow(() => advanceMinutes(g, 3), "cash");
@@ -537,7 +611,8 @@ describe("overflow mid-day", () => {
   });
 
   it("an advance that stops before the overflowing slot succeeds and the next one throws", () => {
-    const g = createGame(1, Number.MAX_SAFE_INTEGER - 60_00, [P60, P60]);
+    const seed = findSeed([P60, P60], 3, (s) => s.fleet.every((c) => c.rented));
+    const g = createGame(seed, Number.MAX_SAFE_INTEGER - 60_00, [P60, P60]);
     const mid = advanceMinutes(g, 2); // only car 0 (minute 0, 1)
     expect(mid.cash).toBe(Number.MAX_SAFE_INTEGER);
     const copy = clone(mid);
@@ -546,7 +621,11 @@ describe("overflow mid-day", () => {
   });
 
   it("todayRevenue unsafe also reports cash", () => {
-    const g: GameState = { ...createGame(1, 0, [P60]), todayRevenue: Number.MAX_SAFE_INTEGER - 10 };
+    const seed = findSeed([P60], 1, (s) => s.fleet[0]?.rented === true);
+    const g: GameState = {
+      ...createGame(seed, 0, [P60]),
+      todayRevenue: Number.MAX_SAFE_INTEGER - 10,
+    };
     expectOverflow(() => advanceMinutes(g, 1), "cash");
   });
 

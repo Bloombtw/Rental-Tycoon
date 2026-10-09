@@ -5,7 +5,6 @@ import {
   FleetFullError,
   InsufficientCashError,
   InvalidPriceError,
-  MAX_ACCEPTED_DAILY_PRICE,
   MAX_CAR_DAILY_COST,
   MAX_CAR_DAILY_PRICE,
   MAX_FLEET_SIZE,
@@ -28,13 +27,18 @@ import {
 // ---------------------------------------------------------------------------
 // Fixtures (core-loop) and helpers
 // ---------------------------------------------------------------------------
+/** Sum of the prices of the cars rented in this fleet snapshot. */
+function revenueOf(fleet: readonly Car[]): number {
+  return fleet.reduce((sum, c) => sum + (c.rented ? c.dailyPrice : 0), 0);
+}
+
 const PROFITABLE: readonly NewCar[] = [
   { dailyPrice: 60_00, dailyCost: 25_00 },
   { dailyPrice: 90_00, dailyCost: 40_00 },
 ];
 const IDLE: readonly NewCar[] = [
   { dailyPrice: 200_00, dailyCost: 30_00 },
-  { dailyPrice: 160_00, dailyCost: 20_00 },
+  { dailyPrice: 180_00, dailyCost: 20_00 },
 ];
 const MIXED: readonly NewCar[] = [
   { dailyPrice: 100_00, dailyCost: 30_00 },
@@ -89,6 +93,7 @@ function stateOf(
     minute: 0,
     cash,
     todayRevenue: 0,
+    customersLeft: 0,
     fleet,
     lastDay: null,
     ...extra,
@@ -97,6 +102,7 @@ function stateOf(
 
 const STATE_KEYS = [
   "cash",
+  "customersLeft",
   "day",
   "fleet",
   "lastDay",
@@ -167,7 +173,7 @@ describe("catalogue and exports", () => {
     expect(m.dailyCost).toBeLessThanOrEqual(MAX_CAR_DAILY_COST);
     expect(Number.isSafeInteger(m.defaultDailyPrice)).toBe(true);
     expect(m.defaultDailyPrice).toBeGreaterThanOrEqual(0);
-    expect(m.defaultDailyPrice).toBeLessThanOrEqual(MAX_ACCEPTED_DAILY_PRICE);
+    expect(m.defaultDailyPrice).toBeLessThanOrEqual(MAX_CAR_DAILY_PRICE);
     expect(m.defaultDailyPrice).toBeGreaterThan(m.dailyCost);
   });
 
@@ -225,7 +231,9 @@ describe("lastDay", () => {
     let s = g;
     for (let i = 0; i < 7; i++) s = tick(s);
     expect(advance(g, 7)).toEqual(s);
-    expect(advance(g, 7).lastDay).toEqual({ revenue: 100_00, costs: 80_00 });
+    const last = advance(g, 7);
+    expect(last.lastDay).toEqual({ revenue: revenueOf(last.fleet), costs: 80_00 });
+    expect(revenueOf(last.fleet)).toBeLessThanOrEqual(100_00); // the 300,00 car is never rented
   });
 
   it("an overflowing tick throws and leaves the input (lastDay too) intact", () => {
@@ -270,7 +278,7 @@ describe("tick and the optional model property", () => {
     const g = tick(tick(createGame(1, C, MIXED)));
     for (const c of g.fleet) {
       expect("model" in c).toBe(false);
-      expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "rented"]);
+      expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "outcome", "rented"]);
     }
   });
 
@@ -624,15 +632,17 @@ describe("setCarPrice", () => {
 
   it("then tick: both cars rented, lastDay 250/80", () => {
     const t = tick(setCarPrice(createGame(1, C, MIXED), 2, 150_00));
-    expect(t.fleet.map((c) => c.rented)).toEqual([true, true]);
-    expect(t.lastDay).toEqual({ revenue: 250_00, costs: 80_00 });
+    // 100,00 and 150,00 are both below 2x the 90,00 reference: rentable, but not certain
+    expect(t.fleet.every((c) => c.rented === (c.outcome === "rented"))).toBe(true);
+    expect(t.lastDay).toEqual({ revenue: revenueOf(t.fleet), costs: 80_00 });
   });
 
-  it("price 150_01 then tick: car idle, no revenue, cost still paid", () => {
-    const t = tick(setCarPrice(createGame(1, C, PROFITABLE), 1, MAX_ACCEPTED_DAILY_PRICE + 1));
+  it("price at 2x the reference then tick: car idle, no revenue, cost still paid", () => {
+    const t = tick(setCarPrice(createGame(1, C, PROFITABLE), 1, 180_00));
     expect((t.fleet[0] as Car).rented).toBe(false);
-    expect(t.lastDay).toEqual({ revenue: 90_00, costs: 65_00 });
-    expect(t.cash).toBe(C + 90_00 - 65_00);
+    expect((t.fleet[0] as Car).outcome).toBe("tooExpensive");
+    expect(t.lastDay).toEqual({ revenue: revenueOf(t.fleet), costs: 65_00 });
+    expect(t.cash).toBe(C + revenueOf(t.fleet) - 65_00);
   });
 
   it("price 0 and MAX_CAR_DAILY_PRICE accepted", () => {
@@ -799,11 +809,18 @@ describe("setCarPrice", () => {
 // ---------------------------------------------------------------------------
 describe("full scenario", () => {
   function play(): GameState {
-    return advance(setCarPrice(buyCar(createGame(1), "compact"), 1, 150_00), 10);
+    return advance(setCarPrice(buyCar(createGame(1), "compact"), 1, 90_00), 10);
   }
 
-  it("buy compact, price 150, 10 days", () => {
-    expect(play().cash).toBe(50_000_00 - 9_000_00 + 10 * 125_00);
+  it("buy compact, price 90 (1.5x the advised 60), 10 days", () => {
+    let g = setCarPrice(buyCar(createGame(1), "compact"), 1, 90_00);
+    let revenue = 0;
+    for (let i = 0; i < 10; i++) {
+      g = tick(g);
+      revenue += revenueOf(g.fleet);
+    }
+    expect(g).toEqual(play());
+    expect(g.cash).toBe(50_000_00 - 9_000_00 + revenue - 10 * 25_00);
   });
 
   it("replaying gives deep-equal states", () => {
@@ -814,9 +831,9 @@ describe("full scenario", () => {
     let g = advance(buyCar(createGame(1), "used"), 2);
     g = buyCar(g, "hybrid");
     expect((g.fleet[1] as Car).id).toBe(2);
-    expect(g.lastDay).toEqual({ revenue: 90_00, costs: 60_00 });
+    expect(g.lastDay).toEqual({ revenue: revenueOf(g.fleet.slice(0, 1)), costs: 60_00 });
     g = tick(g);
-    expect(g.lastDay).toEqual({ revenue: 90_00 + 120_00, costs: 60_00 + 10_00 });
+    expect(g.lastDay).toEqual({ revenue: revenueOf(g.fleet), costs: 60_00 + 10_00 });
   });
 });
 

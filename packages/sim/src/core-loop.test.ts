@@ -5,7 +5,6 @@ import {
   InvalidFleetError,
   InvalidSeedError,
   InvalidStartingCashError,
-  MAX_ACCEPTED_DAILY_PRICE,
   MAX_ADVANCE_DAYS,
   MAX_CAR_DAILY_COST,
   MAX_CAR_DAILY_PRICE,
@@ -31,13 +30,33 @@ const PROFITABLE: readonly NewCar[] = [
 ];
 const IDLE: readonly NewCar[] = [
   { dailyPrice: 200_00, dailyCost: 30_00 },
-  { dailyPrice: 160_00, dailyCost: 20_00 },
+  { dailyPrice: 180_00, dailyCost: 20_00 }, // exactly 2x the 90,00 fixture reference
 ];
 const MIXED: readonly NewCar[] = [
   { dailyPrice: 100_00, dailyCost: 30_00 },
   { dailyPrice: 300_00, dailyCost: 50_00 },
 ];
 const C: Cents = 10_000_00;
+
+/** Sum of the prices of the cars rented in this fleet snapshot. */
+function revenueOf(fleet: readonly Car[]): number {
+  return fleet.reduce((s, c) => s + (c.rented ? c.dailyPrice : 0), 0);
+}
+
+/** Ticks `n` days one by one, summing revenue and costs read from the resulting fleets. */
+function playDays(g0: GameState, n: number): { end: GameState; revenue: number; costs: number } {
+  let g = g0;
+  let revenue = 0;
+  let costs = 0;
+  for (let i = 0; i < n; i++) {
+    g = tick(g);
+    const dayCosts = g.fleet.reduce((s, c) => s + c.dailyCost, 0);
+    revenue += revenueOf(g.fleet);
+    costs += dayCosts;
+    expect(g.lastDay).toEqual({ revenue: revenueOf(g.fleet), costs: dayCosts });
+  }
+  return { end: g, revenue, costs };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers for untyped / hostile input (no `any`, no ts-ignore)
@@ -119,7 +138,7 @@ function fleetOf(n: number, car: NewCar): NewCar[] {
 // ---------------------------------------------------------------------------
 describe("exports", () => {
   it("constants have exactly the specified values", () => {
-    expect(MAX_ACCEPTED_DAILY_PRICE).toBe(150_00);
+    expect("MAX_ACCEPTED_DAILY_PRICE" in sim).toBe(false);
     expect(MAX_CAR_DAILY_PRICE).toBe(1_000_00);
     expect(MAX_CAR_DAILY_COST).toBe(1_000_00);
     expect(MAX_FLEET_SIZE).toBe(50);
@@ -593,17 +612,22 @@ describe("createGame: existing sim.test.ts behaviours stay RangeErrors", () => {
 // tick and revenue
 // ---------------------------------------------------------------------------
 describe("tick: revenue", () => {
-  it("PROFITABLE: cash strictly increases every day", () => {
+  it("PROFITABLE: every day's cash change = rented prices - costs (costs always paid)", () => {
     let s = createGame(7, C, PROFITABLE);
     for (let i = 0; i < 100; i++) {
       const next = tick(s);
-      expect(next.cash).toBeGreaterThan(s.cash);
+      expect(next.cash).toBe(s.cash + revenueOf(next.fleet) - 65_00);
+      expect(next.lastDay?.costs).toBe(65_00);
       s = next;
     }
   });
 
-  it.each([1, 30, 365, 3650])("PROFITABLE: advance %i days => C + N * 85_00", (n) => {
-    expect(advance(createGame(3, C, PROFITABLE), n).cash).toBe(C + n * 85_00);
+  it.each([1, 30, 365, 3650])("PROFITABLE: advance %i days => C + revenue - N * 65_00", (n) => {
+    const { end, revenue, costs } = playDays(createGame(3, C, PROFITABLE), n);
+    expect(costs).toBe(n * 65_00);
+    expect(revenue).toBeLessThanOrEqual(n * 150_00);
+    expect(end.cash).toBe(C + revenue - costs);
+    expect(advance(createGame(3, C, PROFITABLE), n)).toEqual(end);
   });
 
   it.each([1, 30, 365, 3650])("IDLE: advance %i days => C - N * 50_00", (n) => {
@@ -624,35 +648,54 @@ describe("tick: revenue", () => {
     expect(tick(g).day).toBe(1001);
   });
 
-  it("MIXED: after 1 tick car 0 rented, car 1 not, cash + 20_00", () => {
+  it("MIXED: after 1 tick the 300,00 car is not rented; cash = C + revenue - 80_00", () => {
     const t = tick(createGame(1, C, MIXED));
-    expect(t.fleet[0]?.rented).toBe(true);
     expect(t.fleet[1]?.rented).toBe(false);
-    expect(t.cash).toBe(C + 20_00);
+    expect(t.fleet[1]?.outcome).toBe("tooExpensive");
+    expect(t.cash).toBe(C + revenueOf(t.fleet) - 80_00);
     expect(t.day).toBe(1);
   });
 
-  it("MIXED: advance N => C + N * 20_00", () => {
-    expect(advance(createGame(1, C, MIXED), 365).cash).toBe(C + 365 * 20_00);
+  it("MIXED: advance N => C + revenue - N * 80_00, revenue only from the 100,00 car", () => {
+    const { end, revenue, costs } = playDays(createGame(1, C, MIXED), 365);
+    expect(costs).toBe(365 * 80_00);
+    expect(revenue % 100_00).toBe(0);
+    expect(revenue).toBeLessThanOrEqual(365 * 100_00);
+    expect(revenue).toBeGreaterThan(0);
+    expect(end.cash).toBe(C + revenue - costs);
+    expect(advance(createGame(1, C, MIXED), 365).cash).toBe(end.cash);
   });
 
-  it("threshold: price == MAX_ACCEPTED_DAILY_PRICE is rented, +1 is not", () => {
+  it("no fixed threshold: 2x the reference is never rented, just below it almost never", () => {
+    const refPrice = 90_00; // fixture reference
     const g = createGame(1, C, [
-      { dailyPrice: MAX_ACCEPTED_DAILY_PRICE - 1, dailyCost: 0 },
-      { dailyPrice: MAX_ACCEPTED_DAILY_PRICE, dailyCost: 0 },
-      { dailyPrice: MAX_ACCEPTED_DAILY_PRICE + 1, dailyCost: 0 },
+      { dailyPrice: 2 * refPrice - 1, dailyCost: 0 },
+      { dailyPrice: 2 * refPrice, dailyCost: 0 },
+      { dailyPrice: 2 * refPrice + 1, dailyCost: 0 },
     ]);
-    const t = tick(g);
-    expect(t.fleet.map((c) => c.rented)).toEqual([true, true, false]);
-    expect(t.cash).toBe(C + MAX_ACCEPTED_DAILY_PRICE - 1 + MAX_ACCEPTED_DAILY_PRICE);
+    let nearLimitRented = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const t = tick({ ...g, seed, rngState: seed });
+      expect(t.fleet[1]?.rented).toBe(false);
+      expect(t.fleet[2]?.rented).toBe(false);
+      if (t.fleet[0]?.rented) nearLimitRented++;
+    }
+    expect(nearLimitRented).toBeLessThanOrEqual(2);
   });
 
-  it("price 0 / cost 10_00 is rented and loses 10_00 per day", () => {
+  it("price 0 / cost 10_00 loses 10_00 per day whether rented (98 %) or not", () => {
     const g = createGame(1, C, [{ dailyPrice: 0, dailyCost: 10_00 }]);
     const t = tick(g);
-    expect(t.fleet[0]?.rented).toBe(true);
+    expect(["rented", "tooExpensive"]).toContain(t.fleet[0]?.outcome);
     expect(t.cash).toBe(C - 10_00);
     expect(advance(g, 7).cash).toBe(C - 70_00);
+    let rented = 0;
+    for (let seed = 1; seed <= 100; seed++) {
+      if (tick(createGame(seed, C, [{ dailyPrice: 0, dailyCost: 10_00 }])).fleet[0]?.rented) {
+        rented++;
+      }
+    }
+    expect(rented).toBeGreaterThan(90);
   });
 
   it("a car at MAX_CAR_DAILY_PRICE is never rented and costs its full dailyCost", () => {
@@ -673,7 +716,9 @@ describe("tick: revenue", () => {
 
     const g2 = createGame(1, C, PROFITABLE);
     const stale2: GameState = { ...g2, fleet: g2.fleet.map((c) => ({ ...c, rented: false })) };
-    expect(tick(stale2).fleet.every((c) => c.rented)).toBe(true);
+    const t2 = tick(stale2);
+    expect(t2.fleet.every((c) => c.rented === (c.outcome === "rented"))).toBe(true);
+    expect(t2.fleet.every((c) => c.outcome !== undefined)).toBe(true);
   });
 
   it("formula holds for a full fleet: cash' = cash + sum(rented prices) - sum(all costs)", () => {
@@ -681,28 +726,29 @@ describe("tick: revenue", () => {
       dailyPrice: (i * 7_00) % (MAX_CAR_DAILY_PRICE + 1),
       dailyCost: (i * 3_33) % (MAX_CAR_DAILY_COST + 1),
     }));
-    let expected = 0;
-    for (const car of fleet) {
-      if (car.dailyPrice <= MAX_ACCEPTED_DAILY_PRICE) expected += car.dailyPrice;
-      expected -= car.dailyCost;
-    }
+    const costs = fleet.reduce((sum, c) => sum + c.dailyCost, 0);
     const t = tick(createGame(9, C, fleet));
-    expect(t.cash).toBe(C + expected);
-    expect(t.fleet.map((c) => c.rented)).toEqual(
-      fleet.map((c) => c.dailyPrice <= MAX_ACCEPTED_DAILY_PRICE),
-    );
+    expect(t.cash).toBe(C + revenueOf(t.fleet) - costs);
+    expect(t.lastDay).toEqual({ revenue: revenueOf(t.fleet), costs });
+    // rented is exactly outcome === "rented"; >= 2x the 90,00 reference is never rented
+    expect(t.fleet.every((c) => c.rented === (c.outcome === "rented"))).toBe(true);
+    for (const c of t.fleet) {
+      if (c.dailyPrice >= 180_00) expect(c.rented).toBe(false);
+    }
   });
 
   it("only the specified fields change: seed, rngState, ids, prices, costs, order", () => {
     const g = createGame(123, C, MIXED);
     const t = advance(g, 5);
     expect(t.seed).toBe(g.seed);
-    expect(t.rngState).toBe(g.rngState);
+    expect(Number.isInteger(t.rngState) && t.rngState >= 0 && t.rngState < 2 ** 32).toBe(true);
+    expect(t.rngState).not.toBe(g.rngState); // demand draws advance the stream
     expect(t.fleet.map((c) => c.id)).toEqual(g.fleet.map((c) => c.id));
     expect(t.fleet.map((c) => c.dailyPrice)).toEqual(g.fleet.map((c) => c.dailyPrice));
     expect(t.fleet.map((c) => c.dailyCost)).toEqual(g.fleet.map((c) => c.dailyCost));
     expect(Object.keys(t).sort()).toEqual([
       "cash",
+      "customersLeft",
       "day",
       "fleet",
       "lastDay",
@@ -712,15 +758,16 @@ describe("tick: revenue", () => {
       "todayRevenue",
     ]);
     for (const c of t.fleet) {
-      expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "rented"]);
+      expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "outcome", "rented"]);
     }
   });
 
-  it("rngState is neither read nor modified (any value survives, even invalid ones)", () => {
+  it("rngState is the random stream: any value gives a deterministic uint32 result", () => {
     const base = createGame(1, C, MIXED);
     for (const rngState of [0, 1, 2 ** 32 - 1, -5, 1.5, NaN]) {
       const t = tick({ ...base, rngState });
-      expect(Object.is(t.rngState, rngState)).toBe(true);
+      expect(Number.isInteger(t.rngState) && t.rngState >= 0 && t.rngState < 2 ** 32).toBe(true);
+      expect(tick({ ...base, rngState })).toEqual(t);
     }
   });
 
@@ -817,14 +864,15 @@ describe("determinism", () => {
     expect(advance(createGame(42, C, MIXED), 100)).toEqual(advance(createGame(42, C, MIXED), 100));
   });
 
-  it("different seeds with the same fleet give the same cash and fleet", () => {
-    const a = advance(createGame(1, C, MIXED), 100);
-    const b = advance(createGame(999, C, MIXED), 100);
-    const c = advance(createGame(-7, C, MIXED), 100);
-    expect(a.cash).toBe(b.cash);
-    expect(a.cash).toBe(c.cash);
-    expect(a.fleet).toEqual(b.fleet);
-    expect(a.fleet).toEqual(c.fleet);
+  it("different seeds with the same fleet keep ids, prices and costs but may differ in cash", () => {
+    const runs = [1, 999, -7, 5, 6, 7].map((seed) => advance(createGame(seed, C, MIXED), 100));
+    const [a, ...others] = runs;
+    for (const o of others) {
+      expect(o.fleet.map((c) => [c.id, c.dailyPrice, c.dailyCost])).toEqual(
+        a?.fleet.map((c) => [c.id, c.dailyPrice, c.dailyCost]),
+      );
+    }
+    expect(new Set(runs.map((r) => r.cash)).size).toBeGreaterThan(1);
   });
 
   it("tick does not depend on Date/global state (same result 1000 times)", () => {
@@ -992,8 +1040,12 @@ describe("advance", () => {
 
   it("advance(g, 3650) with MAX_FLEET_SIZE cars finishes and is exact", () => {
     const fleet = fleetOf(MAX_FLEET_SIZE, { dailyPrice: 60_00, dailyCost: 25_00 });
+    const { end, revenue, costs } = playDays(createGame(1, C, fleet), MAX_ADVANCE_DAYS);
     const t = advance(createGame(1, C, fleet), MAX_ADVANCE_DAYS);
-    expect(t.cash).toBe(C + MAX_ADVANCE_DAYS * MAX_FLEET_SIZE * 35_00);
+    expect(t).toEqual(end);
+    expect(costs).toBe(MAX_ADVANCE_DAYS * MAX_FLEET_SIZE * 25_00);
+    expect(revenue).toBeLessThan(MAX_ADVANCE_DAYS * MAX_FLEET_SIZE * 60_00);
+    expect(t.cash).toBe(C + revenue - costs);
     expect(t.day).toBe(MAX_ADVANCE_DAYS);
     expect(t.fleet).toHaveLength(MAX_FLEET_SIZE);
   });
@@ -1089,16 +1141,22 @@ describe("overflow", () => {
     ["dailyCost 0.5", { dailyPrice: 1, dailyCost: 0.5 }],
     ["dailyCost 2**60", { dailyPrice: 1, dailyCost: 2 ** 60 }],
     ["dailyPrice 0.5 (rented, fractional revenue)", { dailyPrice: 0.5, dailyCost: 0 }],
-    [
-      "dailyPrice -Infinity (rented, infinite negative revenue)",
-      { dailyPrice: -Infinity, dailyCost: 0 },
-    ],
   ])("hand-built corrupted car (%s): tick throws SimOverflowError(cash)", (_l, car) => {
     const g: GameState = {
       ...createGame(1, C),
       fleet: [{ id: 1, rented: false, ...car }],
     };
     expectOverflow(() => tick(g), "cash");
+  });
+
+  it("hand-built car with dailyPrice -Infinity is never rented (non-finite price: 0 % acceptance)", () => {
+    const g: GameState = {
+      ...createGame(1, C),
+      fleet: [{ id: 1, rented: false, dailyPrice: -Infinity, dailyCost: 0 }],
+    };
+    const t = tick(g);
+    expect(t.fleet[0]?.rented).toBe(false);
+    expect(t.cash).toBe(C);
   });
 
   it("revenue/costs individually unsafe but net+cash looks fine still throws (cash field)", () => {

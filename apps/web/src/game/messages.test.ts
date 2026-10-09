@@ -15,6 +15,7 @@ import {
 import { formatCents } from "../format.js";
 import {
   CAR_MODEL_LABELS,
+  carStatusLabel,
   PRICE_FORMAT_ERROR,
   PRICE_RANGE_ERROR,
   errorMessage,
@@ -138,5 +139,19 @@ describe("constants", () => {
     expect(PRICE_FORMAT_ERROR).toBe(
       "Format invalide : saisissez un montant en euros, par ex. 89,90.",
     );
+  });
+});
+
+describe("carStatusLabel (random-demand.md)", () => {
+  it("names the reason a car stayed at the lot", () => {
+    expect(carStatusLabel({ rented: true, outcome: "rented" })).toBe("Louée");
+    expect(carStatusLabel({ rented: false, outcome: "tooExpensive" })).toBe(
+      "Au parking · trop cher",
+    );
+    expect(carStatusLabel({ rented: false, outcome: "noCustomer" })).toBe(
+      "Au parking · pas de client",
+    );
+    expect(carStatusLabel({ rented: false })).toBe("Au parking");
+    expect(carStatusLabel({ rented: false, outcome: "junk" })).toBe("Au parking");
   });
 });
