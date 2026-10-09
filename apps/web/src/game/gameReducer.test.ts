@@ -56,6 +56,7 @@ describe("initUiState", () => {
       paused: true,
       hasRun: false,
       dayBanner: null,
+      offline: null,
     });
   });
 
