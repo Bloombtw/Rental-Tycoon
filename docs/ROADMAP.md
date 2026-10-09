@@ -69,14 +69,20 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 6. ✅ **Managers / employés** (`managers.md`) : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
 7. ✅ **Récompense quotidienne** (`daily-reward.md`) (série de connexions).
 
-## Prioritaire — Boutique
+## Prioritaire (dans cet ordre)
 
-- ✅ **Boutique (argent réel, paiement crypto) — mode test** (`shop.md`) : diamants, pack de démarrage, boosters ; prestataire d'exemple NOWPayments via une fonction serverless (non déployée). Passage en réel : voir `docs/QUESTIONS.md`.
+1. ⬜ **Tutoriel forcé avec René, l'ancien gérant** (refonte de `tutorial.md`, `tutorial.ts`, `CoachCard.tsx`). René part à la retraite et te confie les clés.
+   - **Personnage** : portrait en bas de l'écran (modèle Kenney `characters/character-male-*` rendu hors écran, sinon SVG soigné), qui respire ou hoche la tête en parlant. Bulle avec texte lettre par lettre (un tap affiche tout, un second passe à la suite), ton chaleureux et un peu bourru, tutoiement. Dans la scène 3D, René attend devant l'agence (`idle`), fait `emote-yes` à chaque réussite et s'éloigne à pied à la fin.
+   - **Guidage forcé** : calque sombre avec un spotlight arrondi et animé sur la cible ; tout le reste est bloqué. Grosse flèche qui rebondit vers la cible : DOM via `data-tutorial="…"`, 3D par projection à l'écran qui suit la caméra. Si la cible est cachée (menu fermé), René fait d'abord ouvrir le bon menu : jamais d'étape sans issue. Pas de « Passer » pendant la première partie ; tutoriel rejouable depuis Réglages → « Revoir le tutoriel ».
+   - **Étapes**, validées par l'action réelle : 1) accueil (2-3 bulles) ; 2) ouvrir la boutique de voitures et acheter la citadine d'occasion ; 3) régler son prix ; 4) lancer le temps puis passer en x2 ou x5 ; 5) la flèche suit une voiture qui part, René commente le « +X € » ; 6) ouvrir les améliorations et acheter la première (cadeau de bienvenue si l'argent manque) ; 7) présenter les missions et la récompense quotidienne ; 8) bilan de fin de journée, au revoir de René, jeu libre.
+   - **Technique** : logique d'étapes pure et testée (étape + événement → étape suivante), étape sauvegardée avec l'autosave (un rechargement reprend au même endroit). Pendant le tutoriel, pas d'événements ni de pop-ups (récompense, gains hors ligne, boutique) : ils sont mis en file pour après. Mobile 390 px, cibles ≥ 44 px, `prefers-reduced-motion` respecté. Le tutoriel ne s'affiche pas pour une sauvegarde existante.
+2. ✅ **Boutique (argent réel, paiement crypto) — mode test** (`shop.md`) : diamants, pack de démarrage, boosters ; prestataire d'exemple NOWPayments via une fonction serverless (non déployée). Passage en réel : voir `docs/QUESTIONS.md`.
 
 ## Phase 3 — Rétention (dans cet ordre)
 
 1. ✅ **Missions** (`missions.md`) : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
-2. ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Bannière + effet temporaire.
+2. ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Effet temporaire.
+   - **Mis en avant par une petite bannière** en haut de l'écran, sous le HUD : icône dessinée, nom de l'événement, effet en clair (« Demande ×2 ») et compte à rebours ou durée restante. Elle entre en glissant, reste visible tant que l'événement dure, sans masquer la scène ni bloquer les taps. Un tap sur la bannière ouvre le détail. Couleur selon le type (bonus ou malus) via `tokens.css`. Au plus une bannière à la fois ; si plusieurs événements sont actifs, afficher le plus récent avec un badge « +1 ».
 3. ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
 
 ## Plus tard (si le temps le permet)
