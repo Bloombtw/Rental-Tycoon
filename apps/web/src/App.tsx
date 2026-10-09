@@ -228,6 +228,7 @@ export function App(props: {
           cash={game.cash}
           fleetSize={game.fleet.length}
           capacity={capacity}
+          xp={game.xp}
           highlight={game.fleet.length === 0}
           onBuy={onBuy}
         />

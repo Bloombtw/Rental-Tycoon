@@ -20,6 +20,7 @@ const state = (day: number, minute: number, fleet: readonly Car[]): GameState =>
   todayRevenue: 0,
   customersLeft: 0,
   upgrades: NO_UPGRADES,
+  xp: 0,
   fleet,
   lastDay: day === 0 ? null : { revenue: 0, costs: 0 },
 });

@@ -22,6 +22,7 @@ import {
   type ObscuredInsets,
   type ScreenRect,
 } from "../scene/camera.js";
+import { MODEL_ASSET_KEYS } from "../scene/assets.js";
 import { carIndexAt } from "../scene/carMotion.js";
 import { departuresBetween, MAX_GAIN_FLOATS } from "../scene/gains.js";
 import { toViewPlane } from "../scene/iso.js";
@@ -74,7 +75,7 @@ interface AgencyViewProps {
 
 /** Size of the thumbnails rendered by the scene (shown at 160 x 120 CSS px at most, x2). */
 const THUMBNAIL_SIZE = { width: 320, height: 240 } as const;
-const THUMBNAIL_KEYS = ["used", "compact", "hybrid"] as const;
+const THUMBNAIL_KEYS = MODEL_ASSET_KEYS;
 /** Longest wait for an idle moment before rendering the thumbnails. */
 const THUMBNAIL_IDLE_TIMEOUT_MS = 2000;
 const THUMBNAIL_FALLBACK_DELAY_MS = 500;

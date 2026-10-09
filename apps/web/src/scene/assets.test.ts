@@ -78,7 +78,9 @@ describe("carAssetKey", () => {
   it("does not read the prototype chain", () => {
     const polluted = Object.create({ used: 1 });
     expect(carAssetKey(polluted)).toBe("unknown");
-    expect(Object.keys(CAR_ASSET).sort()).toEqual(["compact", "hybrid", "unknown", "used"]);
+    expect(Object.keys(CAR_ASSET).sort()).toEqual(
+      ["compact", "electric", "hybrid", "luxury", "sport", "suv", "unknown", "used", "van"].sort(),
+    );
   });
 });
 
@@ -113,7 +115,9 @@ describe("asset tables", () => {
     expect(Object.keys(TRAFFIC_ASSET).sort()).toEqual(
       ["ambulance", "delivery", "garbage-truck", "police", "suv", "taxi", "truck", "van"].sort(),
     );
-    const player = new Set(Object.values(CAR_ASSET).map((r) => r.name));
+    // The starting models never appear in traffic; the unlockable SUV shares the suv model on
+    // purpose (agency-level.md, decision 2): player cars keep their tints and rented dots.
+    const player = new Set([CAR_ASSET.used.name, CAR_ASSET.compact.name, CAR_ASSET.hybrid.name]);
     for (const [model, r] of Object.entries(TRAFFIC_ASSET)) {
       expect(r).toEqual({ kit: "cars", name: model });
       expect(player.has(r.name), `${model} uses a player asset`).toBe(false);

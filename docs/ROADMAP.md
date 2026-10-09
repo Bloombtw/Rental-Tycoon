@@ -18,6 +18,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
   - `cars/` (Car Kit) : `sedan`, `sedan-sports`, `hatchback-sports`, `suv`, `suv-luxury`, `van`, `delivery`, `truck`, `taxi`, `police`, `ambulance`… + `cone`, `box`, débris (pannes), roues séparées. Chaque voiture = carrosserie + 4 nœuds de roue (animables).
   - `roads/` (City Kit Roads, 95 éléments) : tuiles de route (droite, virage, croisement, T, fin), marquages, lampadaires, panneaux, barrières de chantier, ponts.
   - `city/` (City Kit Commercial, 41 éléments) : bâtiments, commerces, gratte-ciels, auvents, détails.
+  - `characters/` (Mini Characters) : PNJ / clients `character-female-a…f` et `character-male-a…f`, animés (skinned : cloner avec `SkeletonUtils.clone`) : `idle`, `walk`, `sprint`, `sit`, `drive`, `pick-up`, `emote-yes`, `emote-no`, `interact-left/right`… + accessoires (`aid-*`, fauteuils roulants). À utiliser pour « Clients visibles ».
   - Chaque kit a son `Textures/colormap.png` (référencé par les `.glb` en chemin relatif : garder cette structure) et son `LICENSE.txt`.
   - Les `.glb` sont mis en cache hors ligne par le service worker au premier chargement (`vite.config.ts`, `runtimeCaching`).
   - Charger via `GLTFLoader` (`three/examples/jsm/loaders/GLTFLoader.js`) avec une URL préfixée par `import.meta.env.BASE_URL` (le jeu est servi sous `/Rental-Tycoon/` sur GitHub Pages).
@@ -63,7 +64,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 1. ✅ **Feedback de gain** : « +90 € » flottants au-dessus des voitures qui partent, compteur de caisse animé, pièces qui volent vers le HUD.
 2. ✅ **Améliorations à coût croissant** (`upgrades.md`) (courbe exponentielle) : agrandir le parking (remplace le plafond fixe `MAX_FLEET_SIZE`), comptoir plus rapide, publicité (+ demande), station de lavage (+ prix accepté).
 3. ⬜ **Clients visibles** dans la vue 3D : petits personnages qui arrivent au comptoir, repartent avec une voiture ou repartent déçus (prix trop élevé).
-4. ⬜ **Niveau d'agence / XP** qui débloque de nouveaux modèles : SUV, utilitaire, électrique, cabriolet, luxe. Le catalogue s'ouvre progressivement.
+4. ✅ **Niveau d'agence / XP** (`agency-level.md`) qui débloque de nouveaux modèles : SUV, utilitaire, électrique, cabriolet, luxe. Le catalogue s'ouvre progressivement.
 5. ⬜ **Tutoriel guidé** (première minute : acheter, tarifer, lancer le temps, lire le bilan), remplace le message d'accueil.
 6. ⬜ **Managers / employés** : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
 7. ⬜ **Récompense quotidienne** (série de connexions).

@@ -12,20 +12,24 @@ export interface AssetRef {
   readonly name: string;
 }
 
-export type CarAssetKey = "used" | "compact" | "hybrid" | "unknown";
+export type CarAssetKey =
+  "used" | "compact" | "hybrid" | "suv" | "van" | "electric" | "sport" | "luxury" | "unknown";
 
-/** Maps a game model to its asset key. Anything but the three known models is "unknown". */
+/** Every game model key, in catalogue order (thumbnails). */
+export const MODEL_ASSET_KEYS: readonly Exclude<CarAssetKey, "unknown">[] = Object.freeze([
+  "used",
+  "compact",
+  "hybrid",
+  "suv",
+  "van",
+  "electric",
+  "sport",
+  "luxury",
+] as const);
+
+/** Maps a game model to its asset key. Anything but a known model is "unknown". */
 export function carAssetKey(model: unknown): CarAssetKey {
-  switch (model) {
-    case "used":
-      return "used";
-    case "compact":
-      return "compact";
-    case "hybrid":
-      return "hybrid";
-    default:
-      return "unknown";
-  }
+  return MODEL_ASSET_KEYS.find((k) => k === model) ?? "unknown";
 }
 
 function ref(kit: Kit, name: string): AssetRef {
@@ -46,6 +50,11 @@ export const CAR_ASSET: Readonly<Record<CarAssetKey, AssetRef>> = Object.freeze(
   used: ref("cars", "hatchback-sports"),
   compact: ref("cars", "sedan"),
   hybrid: ref("cars", "sedan-sports"),
+  suv: ref("cars", "suv"),
+  van: ref("cars", "delivery-flat"),
+  electric: ref("cars", "race-future"),
+  sport: ref("cars", "race"),
+  luxury: ref("cars", "suv-luxury"),
   unknown: ref("cars", "sedan"),
 });
 

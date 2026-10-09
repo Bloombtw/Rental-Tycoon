@@ -97,6 +97,7 @@ function stateOf(
     todayRevenue: 0,
     customersLeft: 0,
     upgrades: FULL_PARKING,
+    xp: 0,
     fleet,
     lastDay: null,
     ...extra,
@@ -114,6 +115,7 @@ const STATE_KEYS = [
   "seed",
   "todayRevenue",
   "upgrades",
+  "xp",
 ];
 
 /** Parking at its maximum (50 places) so the tests can buy freely (upgrades.md). */
@@ -149,25 +151,36 @@ describe("catalogue and exports", () => {
   });
 
   it("CAR_MODELS has exactly the spec values", () => {
+    const m = (purchasePrice: number, dailyCost: number, price: number, unlockLevel: number) => ({
+      purchasePrice,
+      dailyCost,
+      defaultDailyPrice: price,
+      unlockLevel,
+    });
     expect(CAR_MODELS).toEqual({
-      used: { id: "used", purchasePrice: 4_000_00, dailyCost: 60_00, defaultDailyPrice: 90_00 },
-      compact: {
-        id: "compact",
-        purchasePrice: 9_000_00,
-        dailyCost: 25_00,
-        defaultDailyPrice: 60_00,
-      },
-      hybrid: {
-        id: "hybrid",
-        purchasePrice: 16_000_00,
-        dailyCost: 10_00,
-        defaultDailyPrice: 120_00,
-      },
+      used: { id: "used", ...m(4_000_00, 60_00, 90_00, 1) },
+      compact: { id: "compact", ...m(9_000_00, 25_00, 60_00, 1) },
+      hybrid: { id: "hybrid", ...m(16_000_00, 10_00, 120_00, 1) },
+      // agency-level.md
+      suv: { id: "suv", ...m(22_000_00, 30_00, 150_00, 2) },
+      van: { id: "van", ...m(18_000_00, 35_00, 140_00, 3) },
+      electric: { id: "electric", ...m(28_000_00, 8_00, 160_00, 4) },
+      sport: { id: "sport", ...m(45_000_00, 50_00, 260_00, 5) },
+      luxury: { id: "luxury", ...m(70_000_00, 60_00, 380_00, 6) },
     });
   });
 
   it("CAR_MODEL_IDS is canonical and matches CAR_MODELS keys; ids self-consistent", () => {
-    expect(CAR_MODEL_IDS).toEqual(["used", "compact", "hybrid"]);
+    expect(CAR_MODEL_IDS).toEqual([
+      "used",
+      "compact",
+      "hybrid",
+      "suv",
+      "van",
+      "electric",
+      "sport",
+      "luxury",
+    ]);
     expect([...CAR_MODEL_IDS].sort()).toEqual(Object.keys(CAR_MODELS).sort());
     for (const id of CAR_MODEL_IDS) expect(CAR_MODELS[id].id).toBe(id);
   });

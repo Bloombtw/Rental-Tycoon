@@ -137,8 +137,9 @@ describe("vehicle list", () => {
     }
   });
 
-  it("no background vehicle ever uses a player car asset", () => {
-    const player = new Set(Object.values(CAR_ASSET).map((r) => r.name));
+  it("no background vehicle ever uses a starting player car asset", () => {
+    // The unlockable SUV shares the suv model on purpose (agency-level.md, decision 2).
+    const player = new Set([CAR_ASSET.used.name, CAR_ASSET.compact.name, CAR_ASSET.hybrid.name]);
     for (const v of vehicles) expect(player.has(TRAFFIC_ASSET[v.model].name)).toBe(false);
   });
 

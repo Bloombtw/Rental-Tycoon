@@ -52,6 +52,8 @@ export interface GameState {
   readonly customersLeft: number;
   /** Level of each upgrade (upgrades.md). */
   readonly upgrades: Upgrades;
+  /** Agency experience: one per euro of rental revenue (agency-level.md). */
+  readonly xp: number;
   readonly fleet: readonly Car[];
   /** Report of the last closed day; null before the first closing. */
   readonly lastDay: DayReport | null;
@@ -110,6 +112,7 @@ export function createGame(
     todayRevenue: 0,
     customersLeft: 0, // drawn when minute 0 is processed
     upgrades: { ...NO_UPGRADES, parking: parkingLevelFor(cars.length) },
+    xp: 0,
     fleet: cars,
     lastDay: null,
   };

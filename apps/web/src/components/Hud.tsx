@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { DAY_MINUTES, type GameState } from "@rt/sim";
+import { DAY_MINUTES, levelForXp, type GameState } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { formatClock, type Speed } from "../game/clock.js";
 import { AnimatedCents } from "../ui/AnimatedCents.js";
@@ -70,6 +70,8 @@ export const Hud = forwardRef<HTMLElement, HudProps>(function Hud(
 ) {
   const negative = game.cash < 0;
   const minute = Number.isFinite(game.minute) ? game.minute : 0;
+  const level = levelForXp(game.xp);
+  const levelPop = usePop(level);
   return (
     <header className="hud glass-dark" ref={ref}>
       <div className="hud-main">
@@ -77,6 +79,16 @@ export const Hud = forwardRef<HTMLElement, HudProps>(function Hud(
           <div className="clock-line">
             <Icon name={clockIcon(game.minute)} size={20} className="clock-icon" />
             <strong data-testid="hud-clock">{formatClock(game.day, game.minute)}</strong>
+            <span
+              className="level-chip"
+              data-testid="hud-level"
+              key={levelPop}
+              data-pop={String(levelPop > 0)}
+              aria-label={`Niveau ${String(level)} de l'agence`}
+            >
+              <Icon name="sparkle" size={16} />
+              {level}
+            </span>
           </div>
           <ProgressBar
             value={minute}

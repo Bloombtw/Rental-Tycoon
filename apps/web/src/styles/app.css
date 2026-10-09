@@ -185,6 +185,42 @@ input {
   color: var(--c-gold-300);
 }
 
+/* Agency level (agency-level.md): a small gold chip after the clock. */
+.level-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  padding: 1px 6px 1px 4px;
+  border-radius: var(--radius-pill);
+  background: var(--c-glass-chip-strong);
+  color: var(--c-gold-300);
+  font-size: var(--fs-sm);
+}
+
+.level-chip[data-pop="true"] {
+  animation: pop var(--dur-slow) var(--ease-spring);
+}
+
+.level-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--c-surface-2);
+  font-size: var(--fs-sm);
+}
+
+.level-progress strong {
+  font-family: var(--font-display);
+}
+
+.buy-card[data-locked="true"] .buy-visual {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
 .clock-pill .progress {
   background: var(--c-glass-well);
 }
@@ -1257,6 +1293,26 @@ input {
 
 .car-illu[data-tint="hybrid"] {
   --car-tint: var(--c-model-hybrid);
+}
+
+.car-illu[data-tint="suv"] {
+  --car-tint: var(--c-model-suv);
+}
+
+.car-illu[data-tint="van"] {
+  --car-tint: var(--c-model-van);
+}
+
+.car-illu[data-tint="electric"] {
+  --car-tint: var(--c-model-electric);
+}
+
+.car-illu[data-tint="sport"] {
+  --car-tint: var(--c-model-sport);
+}
+
+.car-illu[data-tint="luxury"] {
+  --car-tint: var(--c-model-luxury);
 }
 
 .car-illu[data-tint="unknown"] {

@@ -4,6 +4,7 @@ import {
   buyCar,
   buyUpgrade,
   createGame,
+  levelForXp,
   setCarPrice,
   type UpgradeId,
   type CarId,
@@ -13,7 +14,13 @@ import {
 } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { dayBannerText, isSpeed, type Speed } from "./clock.js";
-import { CAR_MODEL_LABELS, NEW_GAME_NOTICE, UPGRADE_LABELS, errorMessage } from "./messages.js";
+import {
+  CAR_MODEL_LABELS,
+  NEW_GAME_NOTICE,
+  UPGRADE_LABELS,
+  errorMessage,
+  levelUpNotice,
+} from "./messages.js";
 import { offlineDays, playOffline, type OfflineReport } from "./offline.js";
 
 export const DEFAULT_SEED = 1;
@@ -124,10 +131,13 @@ function advanceTime(state: UiState, minutes: unknown): UiState {
     const next = advanceMinutes(state.game, minutes as number);
     if (next === state.game) return state;
     const closed = next.day > state.game.day;
+    const before = levelForXp(state.game.xp);
+    const after = levelForXp(next.xp);
     return {
       ...state,
       game: next,
       dayBanner: closed ? dayBannerText(next.day, next.lastDay) : state.dayBanner,
+      ...(after > before ? { notice: levelUpNotice(after), error: null } : {}),
     };
   } catch (err) {
     return { ...state, paused: true, error: errorMessage(err), notice: null };
