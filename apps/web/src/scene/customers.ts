@@ -13,22 +13,24 @@ import { SPOT_D, TILE, type AgencyLayout } from "./layout.js";
 
 /** Game minutes. */
 export const ARRIVE_MINUTES = 30;
-export const WAIT_MINUTES = 8;
-export const TO_CAR_MINUTES = 3;
+export const WAIT_MINUTES = 12;
+export const TO_CAR_MINUTES = 6;
 export const LEAVE_MINUTES = 20;
+/** A refusing customer shakes the head this long before walking away. */
+export const REFUSE_MINUTES = 4;
 
-/** Most customers drawn at once. */
-export const MAX_CUSTOMERS_SHOWN = 60;
+/** Most customers drawn at once (each is a skinned model: two draw calls). */
+export const MAX_CUSTOMERS_SHOWN = 16;
 
-/** Stride: radians of leg swing per metre walked. */
-const STRIDE_PER_METRE = 2.4;
+/** Metres covered by one full walk cycle of the character animation (two steps). */
+export const WALK_CYCLE_METRES = 1.5;
 
 export interface CustomerPose {
   readonly x: number;
   readonly z: number;
   /** Yaw around +y; 0 faces +z. */
   readonly heading: number;
-  /** Leg swing phase in radians; 0 when standing. */
+  /** Metres walked on the current leg (drives the walk animation, so feet never slide). */
   readonly stride: number;
   readonly walking: boolean;
   /** Leaving without a car (price too high). */
@@ -44,7 +46,14 @@ interface P {
 
 /** The walkway along the top of the lot, in front of the awning. */
 function walkZ(): number {
-  return TILE + 0.8;
+  // Under the awning, north of the first row of cars.
+  return TILE - 0.5;
+}
+
+/** Path from the counter to a car around the parked cars: lot's west edge, then the aisle. */
+function toCarPath(layout: AgencyLayout, counter: P, car: P): P[] {
+  const edgeX = layout.lot.x + 0.4;
+  return [counter, { x: edgeX, z: counter.z }, { x: edgeX, z: car.z }, car];
 }
 
 export function customerAnchors(layout: AgencyLayout): { spawn: P; counter: P } {
@@ -98,7 +107,7 @@ function walk(path: readonly P[], t: number, seed: number, sad: boolean): Custom
     x: p.x,
     z: p.z,
     heading: p.heading,
-    stride: p.dist * STRIDE_PER_METRE,
+    stride: p.dist,
     walking: true,
     sad,
     seed,
@@ -162,11 +171,22 @@ export function customerPosesAt(
         seed,
       });
     } else if (t >= dep - TO_CAR_MINUTES && t < dep) {
-      out.push(walk([counter, car_], (t - (dep - TO_CAR_MINUTES)) / TO_CAR_MINUTES, seed, false));
-    } else if (resolved && sad && t >= dep && t < dep + LEAVE_MINUTES) {
-      out.push(
-        walk([car_, { x: car_.x, z: spawn.z }, spawn], (t - dep) / LEAVE_MINUTES, seed, true),
-      );
+      const k = (t - (dep - TO_CAR_MINUTES)) / TO_CAR_MINUTES;
+      out.push(walk(toCarPath(layout, counter, car_), k, seed, false));
+    } else if (resolved && sad && t >= dep && t < dep + REFUSE_MINUTES) {
+      // Shakes the head next to the car before leaving.
+      out.push({
+        x: car_.x,
+        z: car_.z,
+        heading: 0,
+        stride: 0,
+        walking: false,
+        sad: true,
+        seed,
+      });
+    } else if (resolved && sad && t >= dep + REFUSE_MINUTES && t < dep + LEAVE_MINUTES) {
+      const k = (t - dep - REFUSE_MINUTES) / (LEAVE_MINUTES - REFUSE_MINUTES);
+      out.push(walk([...toCarPath(layout, spawn, car_)].reverse(), k, seed, true));
     }
   }
   return out;

@@ -185,17 +185,27 @@ input {
   color: var(--c-gold-300);
 }
 
-/* Agency level (agency-level.md): a small gold chip after the clock. */
+/* Agency level (agency-level.md): a small gold badge on the clock pill's corner, so it never
+   widens the HUD row. */
+.clock-pill {
+  position: relative;
+}
+
 .level-chip {
+  position: absolute;
+  top: -11px;
+  right: -4px;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  margin-left: 2px;
-  padding: 1px 6px 1px 4px;
+  gap: 1px;
+  padding: 1px 5px 1px 3px;
   border-radius: var(--radius-pill);
-  background: var(--c-glass-chip-strong);
-  color: var(--c-gold-300);
-  font-size: var(--fs-sm);
+  background: var(--g-gold);
+  color: var(--c-ink);
+  box-shadow: var(--elev-2);
+  font-size: 12px;
+  line-height: 1.2;
+  text-shadow: none;
 }
 
 .level-chip[data-pop="true"] {
