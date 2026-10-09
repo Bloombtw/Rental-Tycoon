@@ -11,6 +11,7 @@ import { NO_DAILY_REWARD, type DailyRewardState } from "./dailyReward.js";
 import { INITIAL_SHOP, type ShopState } from "./shop.js";
 import { INITIAL_MISSIONS, type MissionsState } from "./missions.js";
 import { FIRST_EVENT_DAY, type ActiveEvent } from "./events.js";
+import type { DayRecord, ModelStat } from "./stats.js";
 
 /** Money is always an integer number of cents. Never use floats for money. */
 export type Cents = number;
@@ -83,6 +84,10 @@ export interface GameState {
   readonly fleet: readonly Car[];
   /** Report of the last closed day; null before the first closing. */
   readonly lastDay: DayReport | null;
+  /** Last closed days, oldest first, at most MAX_HISTORY_DAYS (stats.md). */
+  readonly history: readonly DayRecord[];
+  /** Cumulative rentals and revenue per model id ("other" = no model) (stats.md). */
+  readonly modelStats: Readonly<Record<string, ModelStat>>;
 }
 
 export interface DayReport {
@@ -148,5 +153,7 @@ export function createGame(
     nextCarId: cars.length + 1,
     fleet: cars,
     lastDay: null,
+    history: [],
+    modelStats: {},
   };
 }

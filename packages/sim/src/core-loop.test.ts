@@ -770,6 +770,8 @@ describe("tick: revenue", () => {
           "event",
           "nextEventDay",
           "nextCarId",
+          "history",
+          "modelStats",
         ])
         .sort(),
     );

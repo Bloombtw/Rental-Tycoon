@@ -50,7 +50,7 @@ describe("data-tutorial targets (the tutorial overlay finds them by these ids)",
       expect(targets(id)[0]?.tagName).toBe("BUTTON");
     }
     // Every menu button of the rail is addressable (staff and settings too).
-    expect(container.querySelectorAll("[data-tutorial]").length).toBe(5);
+    expect(container.querySelectorAll("[data-tutorial]").length).toBe(6);
   });
 
   it("speed controls: pause/resume button and the x2 button", () => {

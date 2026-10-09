@@ -16,6 +16,7 @@ import {
   type GameState,
   type RentalOutcome,
 } from "./state.js";
+import { MAX_HISTORY_DAYS, type DayRecord, type ModelStat } from "./stats.js";
 import { DAY_MINUTES } from "./time.js";
 import { EVENT_KINDS, FIRST_EVENT_DAY, MAX_EVENT_DEMAND_PCT, type ActiveEvent } from "./events.js";
 import { NO_DAILY_REWARD, type DailyRewardState } from "./dailyReward.js";
@@ -47,7 +48,7 @@ import {
 } from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 10;
+export const GAME_STATE_VERSION = 11;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -249,7 +250,51 @@ function parse(raw: unknown): GameState {
     nextCarId,
     fleet,
     lastDay,
+    history: parseHistory(own(raw, "history")),
+    modelStats: parseModelStats(own(raw, "modelStats")),
   };
+}
+
+function parseHistory(raw: unknown): DayRecord[] {
+  if (!Array.isArray(raw)) throw new InvalidGameStateError("history", "type");
+  const items: unknown[] = raw;
+  if (items.length > MAX_HISTORY_DAYS) throw new InvalidGameStateError("history", "range");
+  const out: DayRecord[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const r = items[i];
+    const p = `history[${i}]`;
+    if (!isRecord(r)) throw new InvalidGameStateError(p, "type");
+    const max = Number.MAX_SAFE_INTEGER;
+    out.push({
+      day: int(own(r, "day"), `${p}.day`, 0, max),
+      revenue: int(own(r, "revenue"), `${p}.revenue`, 0, max),
+      costs: int(own(r, "costs"), `${p}.costs`, 0, max),
+      cash: int(own(r, "cash"), `${p}.cash`, Number.MIN_SAFE_INTEGER, max),
+    });
+  }
+  return out;
+}
+
+function parseModelStats(raw: unknown): Record<string, ModelStat> {
+  if (!isRecord(raw)) throw new InvalidGameStateError("modelStats", "type");
+  const known: readonly string[] = [...CAR_MODEL_IDS, "other"];
+  const out: Record<string, ModelStat> = {};
+  for (const key of Object.keys(raw)) {
+    const p = `modelStats.${key}`;
+    if (!known.includes(key)) throw new InvalidGameStateError(p, "unknownModel");
+    const v = own(raw, key);
+    if (!isRecord(v)) throw new InvalidGameStateError(p, "type");
+    out[key] = {
+      rentals: int(own(v, "rentals"), `${p}.rentals`, 0, Number.MAX_SAFE_INTEGER),
+      revenue: int(own(v, "revenue"), `${p}.revenue`, 0, Number.MAX_SAFE_INTEGER),
+    };
+  }
+  return out;
+}
+
+/** v10 → v11: adds `history` and `modelStats` (empty). */
+function migrateV10(raw: unknown): unknown {
+  return isRecord(raw) ? { ...raw, history: [], modelStats: {} } : raw;
 }
 
 /**
@@ -462,6 +507,7 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
     if (stateVersion < 8) data = migrateV7(data);
     if (stateVersion < 9) data = migrateV8(data);
     if (stateVersion < 10) data = migrateV9(data);
+    if (stateVersion < 11) data = migrateV10(data);
   } catch {
     throw new InvalidGameStateError("$", "type");
   }

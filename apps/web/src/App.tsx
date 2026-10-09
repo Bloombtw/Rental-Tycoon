@@ -19,6 +19,7 @@ import {
 import { ManagersPanel } from "./components/ManagersPanel.js";
 import { PanelSheet } from "./components/PanelSheet.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
+import { StatsPanel } from "./components/StatsPanel.js";
 import { SideRail, type PanelId } from "./components/SideRail.js";
 import { MissionsPanel } from "./components/MissionsPanel.js";
 import { UpgradesPanel } from "./components/UpgradesPanel.js";
@@ -596,6 +597,15 @@ export function App(props: {
           onHire={onHireManager}
           onFire={onFireManager}
         />
+      </PanelSheet>
+      <PanelSheet
+        open={panel === "stats"}
+        title="Statistiques"
+        icon="chart"
+        testId="panel-stats"
+        onClose={onClosePanel}
+      >
+        <StatsPanel history={game.history} modelStats={game.modelStats} />
       </PanelSheet>
       <PanelSheet
         open={panel === "settings"}

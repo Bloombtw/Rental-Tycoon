@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Icon, type IconName } from "../ui/icons.js";
 
 /** The menus reachable from the side rail (side-menu.md). */
-export type PanelId = "missions" | "cars" | "upgrades" | "staff" | "settings";
+export type PanelId = "missions" | "cars" | "upgrades" | "staff" | "stats" | "settings";
 
 interface RailItem {
   readonly id: PanelId | "shop";
@@ -15,6 +15,7 @@ const ITEMS: readonly RailItem[] = [
   { id: "cars", icon: "car", label: "Voitures" },
   { id: "upgrades", icon: "wrench", label: "Agence" },
   { id: "staff", icon: "key", label: "Employés" },
+  { id: "stats", icon: "chart", label: "Stats" },
   { id: "shop", icon: "shop", label: "Boutique" },
   { id: "settings", icon: "settings", label: "Réglages" },
 ];

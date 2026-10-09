@@ -826,8 +826,8 @@ describe("save v10", () => {
     return advance(g, 6);
   };
 
-  it("is version 10", () => {
-    expect(GAME_STATE_VERSION).toBe(10);
+  it("is version 11", () => {
+    expect(GAME_STATE_VERSION).toBe(11);
   });
 
   it("round-trips a worn fleet", () => {

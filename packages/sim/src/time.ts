@@ -19,6 +19,7 @@ import { createRng, type Rng } from "./rng.js";
 import { adsBonusPct, boostedAcceptance, washedReference } from "./upgrades.js";
 import { managedFleet, managersSalary, mechanicHired, salesBonusPct } from "./managers.js";
 import { boostDemandPct, revenueMultiplier } from "./shop.js";
+import { MAX_HISTORY_DAYS, modelStatKey, type DayRecord, type ModelStat } from "./stats.js";
 import type { Car, GameState, RentalOutcome } from "./state.js";
 import {
   breakdownChance,
@@ -95,6 +96,8 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   const left = state.customersLeft;
   let customersLeft = typeof left === "number" && Number.isSafeInteger(left) && left > 0 ? left : 0;
   let xp = Number.isSafeInteger(state.xp) && state.xp > 0 ? state.xp : 0;
+  let history = state.history;
+  let modelStats = state.modelStats;
   let copy: Car[] | null = null;
   // Created on first draw only, so a span without random events leaves rngState untouched.
   const lazy: { rng: Rng | null } = { rng: null };
@@ -181,6 +184,18 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
         if (!Number.isSafeInteger(cash) || !Number.isSafeInteger(todayRevenue)) {
           throw new SimOverflowError("cash");
         }
+        const key = modelStatKey(car);
+        const prev: ModelStat | undefined = Object.prototype.hasOwnProperty.call(modelStats, key)
+          ? modelStats[key]
+          : undefined;
+        const stat: ModelStat = {
+          rentals: (prev?.rentals ?? 0) + 1,
+          revenue: (prev?.revenue ?? 0) + earned,
+        };
+        if (!Number.isSafeInteger(stat.rentals) || !Number.isSafeInteger(stat.revenue)) {
+          throw new SimOverflowError("cash");
+        }
+        modelStats = { ...modelStats, [key]: stat };
         xp += rentalXp(car.dailyPrice); // agency experience (agency-level.md)
       }
       if (car.rented !== rented || car.outcome !== outcome) {
@@ -201,6 +216,8 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     cash -= costs;
     if (!Number.isSafeInteger(cash)) throw new SimOverflowError("cash");
     lastDay = { revenue: todayRevenue, costs };
+    const record: DayRecord = { day, revenue: todayRevenue, costs, cash };
+    history = [...history, record].slice(-MAX_HISTORY_DAYS);
     // Wear at closing: one more day, and the cars lose condition (more when rented).
     const fleetNow = copy ?? state.fleet;
     if (fleetNow.length > 0) {
@@ -238,5 +255,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     nextCarId: state.nextCarId,
     fleet: copy ?? state.fleet,
     lastDay,
+    history,
+    modelStats,
   };
 }

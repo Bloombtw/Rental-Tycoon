@@ -37,6 +37,7 @@ export type IconName =
   | "sound-on"
   | "sound-off"
   | "construction"
+  | "chart"
   | "event-holidays"
   | "event-show"
   | "event-strike"
@@ -100,6 +101,15 @@ function glyph(name: IconName): JSX.Element {
           <path d="M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11z" />
           <path d="M5.5 14v6h13v-6" />
           <path d="M10 20v-4h4v4" />
+        </>
+      );
+    case "chart":
+      return (
+        <>
+          <path d="M4 20h16" />
+          <rect x="5" y="12" width="3.5" height="8" rx="1" {...SOFT} />
+          <rect x="10.25" y="6" width="3.5" height="14" rx="1" {...SOFT} />
+          <rect x="15.5" y="9" width="3.5" height="11" rx="1" {...SOFT} />
         </>
       );
     case "construction":

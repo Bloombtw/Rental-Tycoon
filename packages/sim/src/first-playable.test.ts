@@ -111,6 +111,8 @@ function stateOf(
     nextCarId: fleet.length + 1,
     fleet,
     lastDay: null,
+    history: [],
+    modelStats: {},
     ...extra,
   };
 }
@@ -134,6 +136,8 @@ const STATE_KEYS = [
   "event",
   "nextEventDay",
   "nextCarId",
+  "history",
+  "modelStats",
 ].sort();
 
 /** Parking at its maximum (50 places) so the tests can buy freely (upgrades.md). */

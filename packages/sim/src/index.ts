@@ -6,6 +6,7 @@ export * from "./events.js";
 export * from "./rng.js";
 export * from "./save.js";
 export * from "./shop.js";
+export * from "./stats.js";
 export * from "./state.js";
 export * from "./tick.js";
 export * from "./managers.js";

@@ -87,7 +87,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 ## Avant le rendu (dans cet ordre, à faire maintenant)
 
 1. ✅ **Revente + usure** (`resale-wear.md`) : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
-2. ⬜ **Statistiques** : historique des jours, graphique de la caisse, rentabilité par modèle.
+2. ✅ **Statistiques** (`stats.md`) : historique des jours, graphique de la caisse, rentabilité par modèle.
 3. ✅ **Nouvelle zone « en chantier » (vitrine uniquement, NE PAS développer la zone)** : montrer qu'une deuxième zone existe (ex. « Aéroport »), sans aucune mécanique de jeu derrière.
    - Une entrée dans le menu latéral (ou sur la carte) avec une icône dessinée de chantier (cône, barrière, casque), le nom de la zone, un cadenas, et au tap le message « En chantier, revenez plus tard ! » (petite modale ou toast).
    - Optionnel si c'est rapide : au bord de la scène 3D, une barrière de chantier et des cônes (assets Kenney `roads/` et `cars/cone`) avec un panneau « Prochainement ».
