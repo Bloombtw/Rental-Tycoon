@@ -92,7 +92,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
    - Une entrée dans le menu latéral (ou sur la carte) avec une icône dessinée de chantier (cône, barrière, casque), le nom de la zone, un cadenas, et au tap le message « En chantier, revenez plus tard ! » (petite modale ou toast).
    - Optionnel si c'est rapide : au bord de la scène 3D, une barrière de chantier et des cônes (assets Kenney `roads/` et `cars/cone`) avec un panneau « Prochainement ».
    - Interdit : pas de nouvel état dans la sim, pas de deuxième agence, pas de bascule entre zones, rien à sauvegarder. Juste de l'UI statique.
-4. ⬜ **Passe de finition** : plus aucune nouvelle fonctionnalité. Parcourir le jeu comme un joueur sur iPhone (390 px portrait) : bugs, textes, chevauchements, NaN, écrans vides, performances. Corriger, puis faire les captures du rendu dans `screenshots/` (tutoriel, HUD, boutique, événement, statistiques, zone en chantier). Nettoyer les fichiers qui traînent à la racine.
+4. ✅ **Passe de finition** : plus aucune nouvelle fonctionnalité. Parcourir le jeu comme un joueur sur iPhone (390 px portrait) : bugs, textes, chevauchements, NaN, écrans vides, performances. Corriger, puis faire les captures du rendu dans `screenshots/` (tutoriel, HUD, boutique, événement, statistiques, zone en chantier). Nettoyer les fichiers qui traînent à la racine.
 
 ## Après le rendu
 
