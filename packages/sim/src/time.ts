@@ -10,6 +10,7 @@ import {
 import { InvalidMinutesError, SimOverflowError } from "./errors.js";
 import { createRng, type Rng } from "./rng.js";
 import { adsBonusPct, boostedAcceptance, washedReference } from "./upgrades.js";
+import { managedFleet, managersSalary, salesBonusPct } from "./managers.js";
 import type { Car, GameState, RentalOutcome } from "./state.js";
 
 /** Opening hours 09:00 -> 21:00, in game minutes. */
@@ -80,14 +81,18 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   const depart = (from: number, to: number): void => {
     if (to <= from) return;
     if (from === 0) {
-      const ads = adsBonusPct(state.upgrades);
-      const pct = draw().int(DEMAND_MIN_PCT + ads, DEMAND_MAX_PCT + ads);
+      const bonus = adsBonusPct(state.upgrades) + salesBonusPct(state.managers);
+      const pct = draw().int(DEMAND_MIN_PCT + bonus, DEMAND_MAX_PCT + bonus);
       customersLeft = DEMAND_BASE + Math.round((state.fleet.length * pct) / 100);
+      // The pricing manager sets the day's prices before the first customer (managers.md).
+      const current = copy ?? state.fleet;
+      const managed = managedFleet(current, state.managers, state.upgrades);
+      if (managed !== current) copy = managed.slice();
     }
     const first = Math.ceil(from / DEPARTURE_STAGGER_MINUTES);
     const limit = Math.min(state.fleet.length, MAX_FLEET_SIZE);
     for (let i = first; i < limit && i * DEPARTURE_STAGGER_MINUTES < to; i++) {
-      const car = state.fleet[i];
+      const car = (copy ?? state.fleet)[i];
       if (car === undefined) continue;
       let outcome: RentalOutcome;
       if (!(customersLeft > 0)) {
@@ -110,8 +115,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
         }
         xp += rentalXp(car.dailyPrice); // agency experience (agency-level.md)
       }
-      const current = copy?.[i] ?? car;
-      if (current.rented !== rented || current.outcome !== outcome) {
+      if (car.rented !== rented || car.outcome !== outcome) {
         if (copy === null) copy = state.fleet.slice();
         copy[i] = { ...car, rented, outcome };
       }
@@ -121,7 +125,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   depart(start, Math.min(end, DAY_MINUTES));
   let minute = end;
   if (end >= DAY_MINUTES) {
-    let costs = 0;
+    let costs = managersSalary(state.managers);
     for (const car of state.fleet) {
       costs += car.dailyCost;
       if (!Number.isSafeInteger(costs)) throw new SimOverflowError("cash");
@@ -145,6 +149,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     customersLeft,
     upgrades: state.upgrades,
     xp,
+    managers: state.managers,
     fleet: copy ?? state.fleet,
     lastDay,
   };

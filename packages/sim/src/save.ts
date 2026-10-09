@@ -18,6 +18,13 @@ import {
 } from "./state.js";
 import { DAY_MINUTES } from "./time.js";
 import {
+  MANAGER_IDS,
+  NO_MANAGERS,
+  SALES_BONUS_PCT,
+  type ManagerId,
+  type Managers,
+} from "./managers.js";
+import {
   ADS_BONUS_PCT,
   fleetCapacity,
   NO_UPGRADES,
@@ -29,7 +36,7 @@ import {
 } from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 4;
+export const GAME_STATE_VERSION = 5;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -128,7 +135,10 @@ function parseCar(raw: unknown, index: number, seen: Set<number>): Car {
 /** Most customers a day can draw (full fleet, top of the demand range). */
 const MAX_CUSTOMERS =
   DEMAND_BASE +
-  Math.round((MAX_FLEET_SIZE * (DEMAND_MAX_PCT + ADS_BONUS_PCT * UPGRADES.ads.maxLevel)) / 100);
+  Math.round(
+    (MAX_FLEET_SIZE * (DEMAND_MAX_PCT + ADS_BONUS_PCT * UPGRADES.ads.maxLevel + SALES_BONUS_PCT)) /
+      100,
+  );
 
 function parseUpgrades(raw: unknown): Upgrades {
   if (!isRecord(raw)) throw new InvalidGameStateError("upgrades", "type");
@@ -181,6 +191,7 @@ function parse(raw: unknown): GameState {
     throw new InvalidGameStateError("upgrades.parking", "inconsistent");
   }
   const xp = int(own(raw, "xp"), "xp", 0, Number.MAX_SAFE_INTEGER);
+  const managers = parseManagers(own(raw, "managers"));
 
   return {
     seed,
@@ -192,12 +203,29 @@ function parse(raw: unknown): GameState {
     customersLeft,
     upgrades,
     xp,
+    managers,
     fleet,
     lastDay,
   };
 }
 
 /** v3 → v4: adds `xp` (a fresh agency: level 1, the first three models stay buyable). */
+/** v4 → v5: adds `managers` (nobody hired). */
+function migrateV4(raw: unknown): unknown {
+  return isRecord(raw) ? { ...raw, managers: { ...NO_MANAGERS } } : raw;
+}
+
+function parseManagers(raw: unknown): Managers {
+  if (!isRecord(raw)) throw new InvalidGameStateError("managers", "type");
+  const out: Record<ManagerId, boolean> = { ...NO_MANAGERS };
+  for (const id of MANAGER_IDS) {
+    const v = own(raw, id);
+    if (typeof v !== "boolean") throw new InvalidGameStateError(`managers.${id}`, "type");
+    out[id] = v;
+  }
+  return out;
+}
+
 function migrateV3(raw: unknown): unknown {
   return isRecord(raw) ? { ...raw, xp: 0 } : raw;
 }
@@ -248,6 +276,7 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
     if (stateVersion < 2) data = migrateV1(data);
     if (stateVersion < 3) data = migrateV2(data);
     if (stateVersion < 4) data = migrateV3(data);
+    if (stateVersion < 5) data = migrateV4(data);
   } catch {
     throw new InvalidGameStateError("$", "type");
   }

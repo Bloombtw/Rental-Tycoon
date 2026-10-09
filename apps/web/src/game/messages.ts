@@ -6,13 +6,16 @@ import {
   InvalidPriceError,
   MAX_CAR_DAILY_PRICE,
   MAX_FLEET_SIZE,
+  ManagerStateError,
   ModelLockedError,
+  UnknownManagerError,
   SimOverflowError,
   UnknownCarError,
   UnknownCarModelError,
   UnknownUpgradeError,
   UpgradeMaxedError,
   type CarModelId,
+  type ManagerId,
   type UpgradeId,
 } from "@rt/sim";
 import { formatCents } from "../format.js";
@@ -33,6 +36,11 @@ export const UPGRADE_LABELS: Readonly<Record<UpgradeId, string>> = Object.freeze
   counter: "Comptoir rapide",
   ads: "Publicité",
   wash: "Station de lavage",
+});
+
+export const MANAGER_LABELS: Readonly<Record<ManagerId, string>> = Object.freeze({
+  sales: "Commercial",
+  pricing: "Gérant",
 });
 
 /** Level-up message: the models it unlocks (agency-level.md). */
@@ -94,8 +102,12 @@ export function errorMessage(error: unknown): string {
     }
     if (error instanceof ModelLockedError) {
       const lvl = Number.isSafeInteger(error.requiredLevel) ? String(error.requiredLevel) : "—";
-      return `Modèle verrouillé : atteignez le niveau ${lvl} de l'agence.`;
+      return `Verrouillé : atteignez le niveau ${lvl} de l'agence.`;
     }
+    if (error instanceof ManagerStateError) {
+      return error.alreadyHired ? "Déjà embauché." : "Personne à ce poste.";
+    }
+    if (error instanceof UnknownManagerError) return "Poste inconnu.";
     if (error instanceof UpgradeMaxedError) return "Cette amélioration est déjà au niveau maximum.";
     if (error instanceof UnknownUpgradeError) return "Amélioration inconnue.";
     if (error instanceof UnknownCarModelError) return "Modèle de voiture inconnu.";
