@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import type { GameState } from "@rt/sim";
@@ -14,6 +15,7 @@ import {
   clampInsets,
   fitCameraInRect,
   panBy,
+  planeToScreen,
   wheelZoomFactor,
   zoomAt,
   type Camera,
@@ -21,6 +23,9 @@ import {
   type ScreenRect,
 } from "../scene/camera.js";
 import { carIndexAt } from "../scene/carMotion.js";
+import { departuresBetween, MAX_GAIN_FLOATS } from "../scene/gains.js";
+import { toViewPlane } from "../scene/iso.js";
+import { formatCents } from "../format.js";
 import {
   INITIAL_GESTURE,
   reduceGesture,
@@ -102,6 +107,19 @@ function setData(el: HTMLElement, key: string, value: string): void {
   if (el.dataset[key] !== value) el.dataset[key] = value;
 }
 
+/** A "+X €" bubble: host-relative position, and the offset to the HUD cash for its coin. */
+interface GainFloat {
+  readonly key: number;
+  readonly x: number;
+  readonly y: number;
+  readonly dx: number;
+  readonly dy: number;
+  readonly text: string;
+}
+
+/** Height above the ground (world units) where a gain bubble starts: just over the car roof. */
+const GAIN_HEIGHT = 2.2;
+
 /** Diagnostic attributes are refreshed at most this often. */
 const DIAGNOSTIC_INTERVAL_MS = 500;
 
@@ -149,6 +167,9 @@ export function AgencyView({
   const insetsRef = useRef(insets);
   const qualityCbRef = useRef(onQualityChange);
   const [progress, setProgress] = useState({ loaded: 0, total: 0 });
+  const [gains, setGains] = useState<readonly GainFloat[]>([]);
+  const lastGainGameRef = useRef<GameState | null>(null);
+  const gainKeyRef = useRef(0);
 
   useEffect(() => {
     gameRef.current = game;
@@ -272,6 +293,45 @@ export function AgencyView({
         scene.update(preview.game, preview.timeOfDay, layout, ambientRef.current);
         scene.setCamera(cam, view);
         scene.render();
+        // "+X €" above the cars that just left on a rental (gain feedback).
+        const committed = gameRef.current;
+        const lastGain = lastGainGameRef.current;
+        if (lastGain !== committed) {
+          lastGainGameRef.current = committed;
+          const departed = lastGain === null ? [] : departuresBetween(lastGain, committed);
+          if (departed.length > 0) {
+            const poses = scene.posesNow();
+            const hostBox = host.getBoundingClientRect();
+            const cashBox = document
+              .querySelector('[data-testid="hud-cash-display"]')
+              ?.getBoundingClientRect();
+            const born: GainFloat[] = [];
+            for (const d of departed.slice(0, MAX_GAIN_FLOATS)) {
+              const pose = poses[d.index];
+              if (!pose) continue;
+              const s = planeToScreen(
+                cam,
+                view,
+                toViewPlane({ x: pose.x, y: GAIN_HEIGHT, z: pose.z }),
+              );
+              if (!Number.isFinite(s.x) || !Number.isFinite(s.y)) continue;
+              const tx = cashBox ? cashBox.left + cashBox.width / 2 - hostBox.left : s.x;
+              const ty = cashBox ? cashBox.top + cashBox.height / 2 - hostBox.top : s.y;
+              gainKeyRef.current += 1;
+              born.push({
+                key: gainKeyRef.current,
+                x: s.x,
+                y: s.y,
+                dx: tx - s.x,
+                dy: ty - s.y,
+                text: `+${formatCents(d.amount)}`,
+              });
+            }
+            if (born.length > 0) {
+              setGains((prev) => [...prev, ...born].slice(-MAX_GAIN_FLOATS));
+            }
+          }
+        }
         setData(host, "carSprites", String(scene.posesNow().length));
         setData(host, "quality", tier);
         const now = performance.now();
@@ -579,6 +639,34 @@ export function AgencyView({
             setTooltip(null);
           }}
         />
+      )}
+      {status === "ready" && gains.length > 0 && (
+        <div className="gain-layer" aria-hidden="true">
+          {gains.map((g) => (
+            <span
+              key={g.key}
+              className="gain-float"
+              data-testid="gain-float"
+              style={
+                {
+                  left: `${String(g.x)}px`,
+                  top: `${String(g.y)}px`,
+                  "--coin-dx": `${String(g.dx)}px`,
+                  "--coin-dy": `${String(g.dy)}px`,
+                } as CSSProperties
+              }
+              onAnimationEnd={(e) => {
+                if (e.target !== e.currentTarget) return;
+                setGains((prev) => prev.filter((x) => x.key !== g.key));
+              }}
+            >
+              <span className="gain-text">{g.text}</span>
+              <span className="gain-coin">
+                <Icon name="coin" size={20} />
+              </span>
+            </span>
+          ))}
+        </div>
       )}
       {status === "ready" && tooltip !== null && content !== null && (
         <CarTooltip

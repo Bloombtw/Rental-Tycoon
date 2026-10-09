@@ -2,7 +2,7 @@
 
 Objectif : que Rental Tycoon ressemble à un **tycoon mobile moderne** de l'App Store (temps réel, retour visuel permanent, progression, objectifs, rétention).
 
-Chaque point passe par `/feature <description>` : spec par `game-designer` dans `docs/specs/`, puis implémentation par les agents propriétaires, `qa-breaker`, `reviewer`. Un point = une spec = une PR. Respecter l'ordre : chaque phase s'appuie sur la précédente.
+Chaque point passe par `/feature <description>` (spec courte seulement si le point est gros). Un point = un commit.
 
 Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 
@@ -38,7 +38,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 - **Repli** : si WebGL est indisponible ou si un `.glb` ne charge pas, le jeu reste jouable (panneaux React) avec un message clair — jamais d'écran blanc.
 - **Tests** : la logique de scène pure (placement, trajets, correspondance modèle → asset, heure → lumière) dans des modules testables sans WebGL ; jsdom n'a pas de WebGL, ne pas instancier `WebGLRenderer` dans les tests unitaires.
 - Couleurs de l'UI via `tokens.css` ; couleurs 3D (ciel, lumières) centralisées dans un module de palette de scène.
-- Chaque feature visuelle se termine par des **captures d'écran** (`/shot`, iPhone 390 px portrait, à 09:00, 15:00 et 20:30) dans `screenshots/`. Le `reviewer` refuse un rendu « programmer art ».
+- Les features visuelles se terminent par une capture d'écran (`/shot`, iPhone 390 px portrait) dans `screenshots/`.
 
 ## Phase 0 — Déjà fait
 
@@ -58,42 +58,32 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 2. ✅ **Demande client tirée au sort** (`random-demand.md`) (via `rng.ts`) : nombre de clients par jour, probabilité d'acceptation décroissante avec le prix. Remplace le seuil fixe `MAX_ACCEPTED_DAILY_PRICE` (aujourd'hui 150 € est toujours optimal : aucune vraie décision). Le badge « Au parking » dit pourquoi (« trop cher », « pas de client »).
 3. ✅ **Gains hors ligne** (`offline-earnings.md`) : à la réouverture, écran « Pendant ton absence : +X € » avec bouton « Récupérer ». Plafond de durée (ex. 8 h), améliorable plus tard. Calcul via la sim pure (`advance`), simplifié si nécessaire pour rester rapide.
 
-## Phase 2 — Retour visuel (« juice »)
+## Phase 2 — Priorités avant le rendu (dans cet ordre)
 
-4. ⬜ **Feedback de gain** : « +90 € » flottants au-dessus des voitures qui partent, compteur de caisse animé, pièces qui volent vers le HUD.
-5. ⬜ **Clients visibles** dans la vue 3D : petits personnages qui arrivent au comptoir, repartent avec une voiture ou repartent déçus (prix trop élevé).
-6. ⬜ **Sons et vibrations** (désactivables) : encaissement, achat, fin de journée.
+1. ✅ **Feedback de gain** : « +90 € » flottants au-dessus des voitures qui partent, compteur de caisse animé, pièces qui volent vers le HUD.
+2. ⬜ **Améliorations à coût croissant** (courbe exponentielle) : agrandir le parking (remplace le plafond fixe `MAX_FLEET_SIZE`), comptoir plus rapide, publicité (+ demande), station de lavage (+ prix accepté).
+3. ⬜ **Clients visibles** dans la vue 3D : petits personnages qui arrivent au comptoir, repartent avec une voiture ou repartent déçus (prix trop élevé).
+4. ⬜ **Niveau d'agence / XP** qui débloque de nouveaux modèles : SUV, utilitaire, électrique, cabriolet, luxe. Le catalogue s'ouvre progressivement.
+5. ⬜ **Tutoriel guidé** (première minute : acheter, tarifer, lancer le temps, lire le bilan), remplace le message d'accueil.
+6. ⬜ **Managers / employés** : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
+7. ⬜ **Récompense quotidienne** (série de connexions).
 
-## Phase 3 — Progression et objectifs
+## Plus tard (si le temps le permet)
 
-7. ⬜ **Améliorations à coût croissant** (courbe exponentielle) : agrandir le parking (remplace le plafond fixe `MAX_FLEET_SIZE`), comptoir plus rapide, publicité (+ demande), station de lavage (+ prix accepté).
-8. ⬜ **Missions** : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
-9. ⬜ **Niveau d'agence / XP** qui débloque de nouveaux modèles : SUV, utilitaire, électrique, cabriolet, luxe. Le catalogue s'ouvre progressivement.
-10. ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien. Introduire `nextCarId` (ne jamais réutiliser un id).
-11. ⬜ **Tutoriel guidé** (première minute : acheter, tarifer, lancer le temps, lire le bilan), remplace le message d'accueil.
-
-## Phase 4 — Profondeur et rétention
-
-12. ⬜ **Managers / employés** : mécanicien (répare automatiquement), commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles.
-13. ⬜ **Nouvelles agences** (centre-ville, gare, aéroport) avec demande et clientèle différentes ; on bascule de l'une à l'autre.
-14. ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Bannière + effet temporaire.
-15. ⬜ **Crédit et faillite** : emprunt pour acheter au-delà de la caisse, game over après X jours de découvert.
-16. ⬜ **Statistiques** : historique des jours, graphique de la caisse, rentabilité par modèle.
-17. ⬜ **Récompense quotidienne** (série de connexions).
-18. ⬜ **Prestige** : revendre l'entreprise contre un bonus permanent et recommencer plus vite. Mécanique de rétention long terme.
+- ⬜ **Sons et vibrations** (désactivables) : encaissement, achat, fin de journée.
+- ⬜ **Missions** : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
+- ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
+- ⬜ **Nouvelles agences** (centre-ville, gare, aéroport) avec demande et clientèle différentes ; on bascule de l'une à l'autre.
+- ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Bannière + effet temporaire.
+- ⬜ **Crédit et faillite** : emprunt pour acheter au-delà de la caisse, game over après X jours de découvert.
+- ⬜ **Statistiques** : historique des jours, graphique de la caisse, rentabilité par modèle.
+- ⬜ **Prestige** : revendre l'entreprise contre un bonus permanent et recommencer plus vite.
 
 ## Règles pour l'agent lead
 
-- Travailler **en autonomie** : enchaîner les points dans l'ordre sans demander de validation entre deux features.
-- Les décisions de design ambiguës : prendre l'option la plus raisonnable pour un tycoon mobile, la noter dans la section « Historique des décisions » de la spec, et lister les vraies questions dans `docs/QUESTIONS.md` au lieu de bloquer.
-- Après chaque feature : `npm run check` vert, captures d'écran à jour, commit, `git push`, cocher le point ici (⬜ → ✅).
-- **Notifications (outil `PushNotification`, arrive sur le téléphone du propriétaire via Remote Control)** — message d'une ligne, < 200 caractères, en français, qui commence par l'action attendue. Envoyer **uniquement** dans ces cas :
-  1. **question vraiment bloquante** : impossible d'avancer sur aucun point de la roadmap sans la réponse (ex. « Question bloquante : retirer pixi.js du package.json ? Voir docs/QUESTIONS.md ») ;
-  2. **échec qui bloque tout** : `npm run check` ou le déploiement en échec après plusieurs tentatives ;
-  3. **feature terminée et poussée** : une notification courte (ex. « Feature Sauvegarde auto en ligne, à tester sur iPhone ») ;
-  4. **roadmap entièrement terminée**.
-
-  Jamais pour la progression de routine ni pour une question non bloquante (celle-ci va dans `docs/QUESTIONS.md` et le travail continue sur le point suivant).
-
-- **Graphismes** : toute spec qui touche à l'affichage contient une section « Rendu » qui détaille les visuels selon la section « Priorité transversale » ci-dessus. Une feature au rendu simpliste n'est pas terminée.
-- Les règles de `CLAUDE.md` priment toujours (sim pure, centimes, mobile first, 100 % navigateur).
+- Enchaîner les points de la phase 2 dans l'ordre, en autonomie. Coder directement ; spec courte seulement pour les gros points.
+- Décision de design ambiguë : prendre l'option la plus raisonnable pour un tycoon mobile et la noter dans `docs/QUESTIONS.md`, sans bloquer.
+- Après chaque point : `npm run check` vert, commit, `git push`, cocher ici (⬜ → ✅). Une capture d'écran si le point est visuel.
+- Notification (`PushNotification`, une ligne en français) seulement si : question vraiment bloquante, échec bloquant après plusieurs tentatives, ou point terminé et poussé.
+- Le rendu doit rester au niveau de la section ⭐, sans en faire un préalable à chaque point.
+- Les règles de `CLAUDE.md` priment toujours.
