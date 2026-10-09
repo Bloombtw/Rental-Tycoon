@@ -71,7 +71,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 
 ## Prioritaire (dans cet ordre)
 
-1. ⬜ **Tutoriel forcé avec René, l'ancien gérant** (refonte de `tutorial.md`, `tutorial.ts`, `CoachCard.tsx`). René part à la retraite et te confie les clés.
+1. ✅ **Tutoriel forcé avec René, l'ancien gérant** (`tutorial.md`, rév. 2) (refonte de `tutorial.md`, `tutorial.ts`, `CoachCard.tsx`). René part à la retraite et te confie les clés.
    - **Personnage** : portrait en bas de l'écran (modèle Kenney `characters/character-male-*` rendu hors écran, sinon SVG soigné), qui respire ou hoche la tête en parlant. Bulle avec texte lettre par lettre (un tap affiche tout, un second passe à la suite), ton chaleureux et un peu bourru, tutoiement. Dans la scène 3D, René attend devant l'agence (`idle`), fait `emote-yes` à chaque réussite et s'éloigne à pied à la fin.
    - **Guidage forcé** : calque sombre avec un spotlight arrondi et animé sur la cible ; tout le reste est bloqué. Grosse flèche qui rebondit vers la cible : DOM via `data-tutorial="…"`, 3D par projection à l'écran qui suit la caméra. Si la cible est cachée (menu fermé), René fait d'abord ouvrir le bon menu : jamais d'étape sans issue. Pas de « Passer » pendant la première partie ; tutoriel rejouable depuis Réglages → « Revoir le tutoriel ».
    - **Étapes**, validées par l'action réelle : 1) accueil (2-3 bulles) ; 2) ouvrir la boutique de voitures et acheter la citadine d'occasion ; 3) régler son prix ; 4) lancer le temps puis passer en x2 ou x5 ; 5) la flèche suit une voiture qui part, René commente le « +X € » ; 6) ouvrir les améliorations et acheter la première (cadeau de bienvenue si l'argent manque) ; 7) présenter les missions et la récompense quotidienne ; 8) bilan de fin de journée, au revoir de René, jeu libre.

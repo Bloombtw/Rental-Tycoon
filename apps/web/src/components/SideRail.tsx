@@ -57,6 +57,7 @@ export function SideRail({
             data-kind={isShop ? "shop" : "menu"}
             data-active={String(item.id === active)}
             data-testid={isShop ? "shop-open" : `rail-${item.id}`}
+            {...(isShop ? {} : { "data-tutorial": `rail-${item.id}` })}
             aria-label={isShop ? `${item.label}, ${String(gems)} diamants` : item.label}
             onClick={() => {
               if (item.id === "shop") onOpenShop();

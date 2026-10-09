@@ -23,7 +23,7 @@ import {
   type ScreenRect,
 } from "../scene/camera.js";
 import { MODEL_ASSET_KEYS } from "../scene/assets.js";
-import { carIndexAt } from "../scene/carMotion.js";
+import { carIndexAt, type CarPose } from "../scene/carMotion.js";
 import { departuresBetween, MAX_GAIN_FLOATS } from "../scene/gains.js";
 import { toViewPlane } from "../scene/iso.js";
 import { formatCents } from "../format.js";
@@ -50,6 +50,7 @@ import type { AgencyScene3D } from "../scene/AgencyScene3D.js";
 import { Button } from "../ui/Button.js";
 import { CarIllustration, Icon } from "../ui/icons.js";
 import { ProgressBar } from "../ui/ProgressBar.js";
+import { failRenePortrait, getRenePortraitState, publishRenePortrait } from "../ui/reneStore.js";
 import { failThumbnails, getThumbnailState, publishThumbnails } from "../ui/thumbnailStore.js";
 import { CarTooltip } from "./CarTooltip.js";
 
@@ -71,8 +72,27 @@ interface AgencyViewProps {
   readonly insets?: ObscuredInsets;
   /** Called with the tier in use once the scene exists and whenever it drops. */
   readonly onQualityChange?: (tier: QualityTier) => void;
+  /**
+   * René, the tutorial guide, in the 3D scene: waits in front of the agency ("idle"), cheers once
+   * ("cheer", then back to idle; pass "idle" in between to cheer twice in a row), walks away and
+   * disappears ("leave"). Defaults to "hidden".
+   */
+  readonly rene?: ReneMode;
+  /**
+   * Screen position of a car currently leaving on a rental, in VIEWPORT coordinates (client px,
+   * the same space as getBoundingClientRect, so a fixed overlay can use it as is). Called when it
+   * changes (every frame while the car drives out) and with null when no car is leaving.
+   */
+  readonly onDepartingCar?: (p: { x: number; y: number } | null) => void;
 }
 
+/** What René does in the scene (mirrors the scene's own type; no three.js import here). */
+export type ReneMode = "hidden" | "idle" | "cheer" | "leave";
+
+/** Size of René's portrait (shown at about 120 x 140 CSS px, x2). */
+const RENE_PORTRAIT_SIZE = { width: 240, height: 280 } as const;
+/** Height above the ground (world units) the departing-car marker points at: the car roof. */
+const DEPARTING_HEIGHT = 1.4;
 /** Size of the thumbnails rendered by the scene (shown at 160 x 120 CSS px at most, x2). */
 const THUMBNAIL_SIZE = { width: 320, height: 240 } as const;
 const THUMBNAIL_KEYS = MODEL_ASSET_KEYS;
@@ -145,6 +165,8 @@ export function AgencyView({
   pendingRef,
   insets = NO_INSETS,
   onQualityChange,
+  rene = "hidden",
+  onDepartingCar,
 }: AgencyViewProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<ViewStatus>(() => (detectWebGL() ? "loading" : "fallback"));
@@ -167,6 +189,8 @@ export function AgencyView({
   const ambientRef = useRef(0);
   const insetsRef = useRef(insets);
   const qualityCbRef = useRef(onQualityChange);
+  const reneRef = useRef<ReneMode>(rene);
+  const departingCbRef = useRef(onDepartingCar);
   const [progress, setProgress] = useState({ loaded: 0, total: 0 });
   const [gains, setGains] = useState<readonly GainFloat[]>([]);
   const lastGainGameRef = useRef<GameState | null>(null);
@@ -179,6 +203,8 @@ export function AgencyView({
     tooltipRef.current = tooltip;
     insetsRef.current = insets;
     qualityCbRef.current = onQualityChange;
+    reneRef.current = rene;
+    departingCbRef.current = onDepartingCar;
   });
 
   // Scene lifetime: detect WebGL, load Three.js lazily, build the scene, clean up completely.
@@ -208,7 +234,12 @@ export function AgencyView({
 
     /** Renders the car thumbnails once, when the browser is idle and nobody is dragging. */
     const scheduleThumbnails = (): void => {
-      if (cancelled || getThumbnailState().status === "ready") return;
+      if (
+        cancelled ||
+        (getThumbnailState().status === "ready" && getRenePortraitState().status === "ready")
+      ) {
+        return;
+      }
       const run = (): void => {
         thumbnailTimer = null;
         const s = scene;
@@ -220,13 +251,23 @@ export function AgencyView({
           };
           return;
         }
-        try {
-          s.renderThumbnails(THUMBNAIL_KEYS, THUMBNAIL_SIZE).then(
-            publishThumbnails,
-            failThumbnails,
-          );
-        } catch {
-          failThumbnails();
+        if (getThumbnailState().status !== "ready") {
+          try {
+            s.renderThumbnails(THUMBNAIL_KEYS, THUMBNAIL_SIZE).then(
+              publishThumbnails,
+              failThumbnails,
+            );
+          } catch {
+            failThumbnails();
+          }
+        }
+        // René's portrait waits for his model (loaded in the background) and the thumbnails.
+        if (getRenePortraitState().status !== "ready") {
+          try {
+            s.renderRenePortrait(RENE_PORTRAIT_SIZE).then(publishRenePortrait, failRenePortrait);
+          } catch {
+            failRenePortrait();
+          }
         }
       };
       if (typeof requestIdleCallback === "function") {
@@ -240,6 +281,45 @@ export function AgencyView({
           id: window.setTimeout(run, THUMBNAIL_FALLBACK_DELAY_MS),
         };
       }
+    };
+
+    /** René keeps the frame loop alive even while the clock is paused (he breathes and walks). */
+    const reneOnScreen = (): boolean => {
+      if (reneRef.current === "hidden" || scene === null) return false;
+      try {
+        return scene.reneActive();
+      } catch {
+        return false;
+      }
+    };
+
+    let lastDeparting: { x: number; y: number } | null = null;
+    /** Reports the screen position (viewport px) of the first car driving out, or null. */
+    const reportDeparting = (cam: Camera, view: ScreenRect, poses: readonly CarPose[]): void => {
+      const cb = departingCbRef.current;
+      if (!cb) return;
+      let next: { x: number; y: number } | null = null;
+      for (const pose of poses) {
+        if (pose.phase !== "departing" || !(pose.alpha > 0.05)) continue;
+        const s = planeToScreen(
+          cam,
+          view,
+          toViewPlane({ x: pose.x, y: DEPARTING_HEIGHT, z: pose.z }),
+        );
+        if (!Number.isFinite(s.x) || !Number.isFinite(s.y)) continue;
+        const box = host.getBoundingClientRect();
+        next = { x: box.left + s.x, y: box.top + s.y };
+        break;
+      }
+      const same =
+        next === null
+          ? lastDeparting === null
+          : lastDeparting !== null &&
+            Math.abs(next.x - lastDeparting.x) < 0.5 &&
+            Math.abs(next.y - lastDeparting.y) < 0.5;
+      if (same) return;
+      lastDeparting = next;
+      cb(next);
     };
 
     const teardown = (): void => {
@@ -294,6 +374,7 @@ export function AgencyView({
         scene.update(preview.game, preview.timeOfDay, layout, ambientRef.current);
         scene.setCamera(cam, view);
         scene.render();
+        reportDeparting(cam, view, scene.posesNow());
         // "+X €" above the cars that just left on a rental (gain feedback).
         const committed = gameRef.current;
         const lastGain = lastGainGameRef.current;
@@ -371,12 +452,12 @@ export function AgencyView({
         }
       }
       draw();
-      if (scene && !pausedRef.current) raf = requestAnimationFrame(loop);
+      if (scene && (!pausedRef.current || reneOnScreen())) raf = requestAnimationFrame(loop);
     };
 
     const syncLoop = (): void => {
       if (!scene) return;
-      if (pausedRef.current) {
+      if (pausedRef.current && !reneOnScreen()) {
         if (raf !== null) cancelAnimationFrame(raf);
         raf = null;
         lastFrame = null;
@@ -510,6 +591,11 @@ export function AgencyView({
         }
         scene = created;
         sceneRef.current = created;
+        try {
+          created.setRene(reneRef.current);
+        } catch {
+          // René is a nicety: never let him break the view.
+        }
         // The scene may have lowered the tier (small GPU textures): start from the real one.
         tier = created.quality();
         qualityCbRef.current?.(tier);
@@ -536,6 +622,10 @@ export function AgencyView({
       resetRef.current = null;
       applyEffectRef.current = null;
       teardown();
+      if (lastDeparting !== null) {
+        lastDeparting = null;
+        departingCbRef.current?.(null);
+      }
     };
   }, [pendingRef]);
 
@@ -543,6 +633,16 @@ export function AgencyView({
   useEffect(() => {
     drawRef.current?.();
   }, [game, paused, status, insets]);
+
+  // René follows the prop; the frame loop restarts if he needs to move while the clock is paused.
+  useEffect(() => {
+    try {
+      sceneRef.current?.setRene(rene);
+    } catch {
+      // ignore: see above
+    }
+    drawRef.current?.();
+  }, [rene]);
 
   const freeInsets = clampInsets(insets, size);
 

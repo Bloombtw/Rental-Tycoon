@@ -66,6 +66,7 @@ function mount(storage: SaveStorage | null, extra: { initialGame?: GameState } =
     root.render(
       <App
         dailyReward={false}
+        tutorial={false}
         clockDriver={driver}
         storage={storage}
         newSeed={() => 99}

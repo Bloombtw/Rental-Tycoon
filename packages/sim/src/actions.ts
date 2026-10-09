@@ -64,3 +64,17 @@ export function setCarPrice(state: GameState, carId: CarId, dailyPrice: Cents): 
     fleet: state.fleet.map((car, i) => (i === index ? { ...car, dailyPrice: price } : car)),
   };
 }
+
+/** Most the welcome gift can give (tutorial.md): enough for the first upgrade. */
+export const MAX_WELCOME_GIFT: Cents = 10_000_00;
+
+/**
+ * René's welcome gift in the tutorial (tutorial.md): tops the cash up by `amount` (capped). Pure.
+ * The tutorial calls it at most once, only when the cash cannot pay the first upgrade.
+ */
+export function giveWelcomeGift(state: GameState, amount: Cents): GameState {
+  if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0) return state;
+  const cash = state.cash + Math.min(amount, MAX_WELCOME_GIFT);
+  if (!Number.isSafeInteger(cash)) throw new SimOverflowError("cash");
+  return { ...state, cash };
+}

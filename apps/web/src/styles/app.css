@@ -733,98 +733,10 @@ input {
 }
 
 /* -------------------------------------------------------- tutorial (tutorial.md) */
-.coach-card {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--elev-3);
-  pointer-events: auto;
-  animation: toast-in var(--dur-base) var(--ease-spring);
-}
-
-.coach-badge {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-pill);
-  background: var(--g-gold);
-  color: var(--c-ink);
-  box-shadow: var(--inset-highlight);
-}
-
-.coach-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.coach-body h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-}
-
-.coach-body p {
-  margin: 0;
-  font-size: var(--fs-sm);
-}
-
-.coach-count {
-  color: var(--c-ink-muted);
-  font-weight: var(--fw-bold);
-}
-
-.coach-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.coach-skip {
-  min-height: var(--tap);
-  padding: 0 var(--space-2);
-  border: 0;
-  background: none;
-  color: var(--c-ink-muted);
-  font: inherit;
-  font-size: var(--fs-sm);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-/* The control the current step is about pulses (opacity-only halo, like "Reprendre"). */
-.app[data-tutorial="buy"] [data-testid="buy-used"],
-.app[data-tutorial="price"] .price-editor,
-.app[data-tutorial="report"] [data-testid="hud-report"] {
-  position: relative;
-}
-
-.app[data-tutorial="buy"] [data-testid="buy-used"]::after,
-.app[data-tutorial="price"] .price-editor::after,
-.app[data-tutorial="report"] [data-testid="hud-report"]::after {
-  content: "";
-  position: absolute;
-  inset: -5px;
-  border: 3px solid var(--c-focus);
-  border-radius: var(--radius);
+/* Last step before the bilan: time runs, but the menus stay shut. */
+.app[data-tutorial-step="dayEnd"] .side-rail,
+.app[data-tutorial-step="dayEnd"] .drawer {
   pointer-events: none;
-  animation: halo 1.6s var(--ease-in-out) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .coach-card {
-    animation: none;
-  }
-
-  .app[data-tutorial] ::after {
-    animation: none;
-  }
 }
 
 .save-warning-ok {
@@ -2710,5 +2622,369 @@ input {
   .panel-sheet,
   .rail-badge {
     animation: none;
+  }
+}
+
+/* ---------- Forced tutorial with René (tutorial.md) ---------- */
+
+.tut-root {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-dialog) + 10);
+  overflow: hidden;
+  pointer-events: none;
+  font-family: var(--font-display);
+}
+
+/* Blocks the pointer; the hole is simply not covered by a blocker. */
+.tut-block {
+  position: fixed;
+  pointer-events: auto;
+  background: transparent;
+  touch-action: none;
+}
+
+.tut-dim {
+  inset: 0;
+  background: var(--c-scrim);
+  animation: fade-in var(--dur-base) var(--ease-out);
+}
+
+/* The spotlight: the shadow around the hole darkens everything else. */
+.tut-hole {
+  position: fixed;
+  box-sizing: border-box;
+  border: 3px solid var(--c-gold-300);
+  box-shadow: 0 0 0 200vmax var(--c-scrim);
+  pointer-events: none;
+  animation: tut-hole-in var(--dur-slow) var(--ease-out);
+}
+
+.tut-hole::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border: 3px solid var(--c-gold-300);
+  border-radius: inherit;
+  opacity: 0;
+  animation: tut-pulse 1.5s var(--ease-out) 0.3s infinite;
+}
+
+@keyframes tut-hole-in {
+  from {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+@keyframes tut-pulse {
+  from {
+    opacity: 0.9;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+/* The big arrow: rotated to point at the target, then bouncing towards it. */
+.tut-arrow {
+  position: fixed;
+  width: 64px;
+  height: 64px;
+  pointer-events: none;
+  transform: rotate(var(--tut-angle, 0deg));
+}
+
+.tut-arrow-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 4px 0 rgb(0 0 0 / 0.28));
+  animation: tut-bounce 0.7s var(--ease-in-out) infinite alternate;
+}
+
+.tut-arrow-shape {
+  fill: var(--c-gold-300);
+  stroke: var(--c-surface);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+@keyframes tut-bounce {
+  from {
+    transform: translateY(-6px);
+  }
+  to {
+    transform: translateY(8px);
+  }
+}
+
+/* René's bar: portrait and speech bubble, on the side away from the target. */
+.tut-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: min(100%, 520px);
+  margin-inline: auto;
+  padding-inline: calc(var(--space-3) + env(safe-area-inset-left))
+    calc(var(--space-3) + env(safe-area-inset-right));
+  pointer-events: none;
+}
+
+.tut-bar[data-side="bottom"] {
+  bottom: 0;
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  animation: tut-bar-in-bottom var(--dur-slow) var(--ease-spring);
+}
+
+.tut-bar[data-side="top"] {
+  top: 0;
+  padding-top: calc(var(--space-3) + env(safe-area-inset-top));
+  animation: tut-bar-in-top var(--dur-slow) var(--ease-spring);
+}
+
+@keyframes tut-bar-in-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+
+@keyframes tut-bar-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-48px);
+  }
+}
+
+/* The whole row is one big button: a tap shows the full line, then the next one. */
+.tut-speaker {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tut-portrait {
+  flex: 0 0 auto;
+  width: 88px;
+  height: 104px;
+}
+
+.tut-portrait-body {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 3px solid var(--c-surface);
+  border-radius: var(--radius-lg);
+  background: var(--g-gold);
+  box-shadow: var(--elev-3);
+}
+
+.tut-portrait-img,
+.tut-portrait-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
+  transform-origin: 50% 100%;
+  animation: tut-breathe 3.2s var(--ease-in-out) infinite;
+}
+
+.tut-portrait[data-talking="true"] .tut-portrait-img,
+.tut-portrait[data-talking="true"] .tut-portrait-svg {
+  animation: tut-nod 0.34s var(--ease-in-out) infinite alternate;
+}
+
+@keyframes tut-breathe {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.015, 1.035);
+  }
+}
+
+@keyframes tut-nod {
+  from {
+    transform: translateY(0) rotate(-1deg);
+  }
+  to {
+    transform: translateY(3px) rotate(1.2deg);
+  }
+}
+
+.rene-skin {
+  fill: var(--c-accent-2);
+}
+.rene-skin-shade {
+  fill: color-mix(in srgb, var(--c-accent-2), var(--c-ink) 18%);
+}
+.rene-cheek {
+  fill: var(--c-primary-300);
+  opacity: 0.45;
+}
+.rene-coat {
+  fill: var(--c-model-suv);
+}
+.rene-coat-shade {
+  fill: color-mix(in srgb, var(--c-model-suv), var(--c-ink) 25%);
+}
+.rene-shirt {
+  fill: var(--c-sand);
+}
+.rene-button {
+  fill: var(--c-gold-500);
+}
+.rene-hair,
+.rene-brow,
+.rene-moustache {
+  fill: var(--c-neutral-100);
+  stroke: var(--c-neutral-300);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+.rene-cap {
+  fill: var(--c-model-used);
+}
+.rene-cap-shade {
+  fill: color-mix(in srgb, var(--c-model-used), var(--c-ink) 18%);
+}
+.rene-cap-brim {
+  fill: color-mix(in srgb, var(--c-model-used), var(--c-ink) 32%);
+}
+.rene-eye {
+  fill: var(--c-ink);
+}
+.rene-eye-shine {
+  fill: var(--c-surface);
+}
+.rene-glass {
+  fill: var(--c-glass-chip-strong);
+  stroke: var(--c-ink);
+  stroke-width: 2.6;
+}
+.rene-glass-bridge {
+  fill: none;
+  stroke: var(--c-ink);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.rene-nose {
+  fill: color-mix(in srgb, var(--c-accent-2), var(--c-accent) 35%);
+}
+.rene-smile {
+  fill: none;
+  stroke: var(--c-ink);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+}
+
+.tut-bubble {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 78px;
+  padding: var(--space-4) var(--space-4) 22px;
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+  color: var(--c-ink);
+  box-shadow: var(--elev-3);
+  animation: pop-in var(--dur-base) var(--ease-spring);
+}
+
+.tut-bubble::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  bottom: 26px;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--c-surface);
+  transform: rotate(45deg);
+}
+
+.tut-name {
+  position: absolute;
+  top: -12px;
+  left: var(--space-4);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--c-accent);
+  color: var(--c-on-dark);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  text-shadow: var(--ts-on-dark);
+  box-shadow: var(--elev-1);
+}
+
+.tut-text {
+  display: block;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* The not-yet-typed part keeps the bubble's final size, so it never jumps while typing. */
+.tut-text-rest {
+  visibility: hidden;
+}
+
+.tut-more {
+  position: absolute;
+  right: var(--space-3);
+  bottom: 8px;
+  width: 0;
+  height: 0;
+  border-top: 9px solid var(--c-accent);
+  border-right: 7px solid transparent;
+  border-left: 7px solid transparent;
+  animation: tut-bounce 0.6s var(--ease-in-out) infinite alternate;
+}
+
+.tut-skip {
+  align-self: flex-end;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--c-glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-dark-opaque);
+  color: var(--c-on-glass);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tut-root *,
+  .tut-root *::before,
+  .tut-root *::after {
+    animation: none !important;
   }
 }

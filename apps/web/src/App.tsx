@@ -24,7 +24,6 @@ import { MissionsPanel } from "./components/MissionsPanel.js";
 import { UpgradesPanel } from "./components/UpgradesPanel.js";
 import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
 import { BuyCarPanel } from "./components/BuyCarPanel.js";
-import { CoachCard } from "./components/CoachCard.js";
 import { DailyRewardDialog } from "./components/DailyRewardDialog.js";
 import { DemoCheckout } from "./components/DemoCheckout.js";
 import { ShopDialog } from "./components/ShopDialog.js";
@@ -40,6 +39,7 @@ import { useGameAudio } from "./game/useGameAudio.js";
 import { DayBanner } from "./components/DayBanner.js";
 import { EventBanner } from "./components/EventBanner.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
+import { TutorialOverlay } from "./components/tutorial/TutorialOverlay.js";
 import { FleetPanel } from "./components/FleetPanel.js";
 import { Hud } from "./components/Hud.js";
 import { ManageDrawer } from "./components/ManageDrawer.js";
@@ -49,6 +49,7 @@ import { NewGameDialog } from "./components/NewGameDialog.js";
 import { OfflineDialog } from "./components/OfflineDialog.js";
 import { SaveWarning } from "./components/SaveWarning.js";
 import { gameReducer } from "./game/gameReducer.js";
+import { tutorialScript, type TutorialStep } from "./game/tutorial.js";
 import { loadInitialState } from "./game/persistence.js";
 import { newSeed } from "./game/seed.js";
 import { browserSaveStorage, type SaveStorage } from "./game/saveStorage.js";
@@ -58,6 +59,17 @@ import { useObscuredInsets } from "./game/useObscuredInsets.js";
 import { initialTier, type QualityTier } from "./scene/quality.js";
 import { browserClockDriver, useGameClock, type ClockDriver } from "./game/useGameClock.js";
 
+type ReneMode = "hidden" | "idle" | "cheer" | "leave";
+/** How long René cheers after a step, and how long his walk away lasts (ms). */
+const CHEER_MS = 1600;
+const LEAVE_MS = 5000;
+
+/** During the tutorial only the menu René asks for may be opened. */
+function menuAllowed(step: TutorialStep, id: PanelId): boolean {
+  if (step === "done") return true;
+  return (step === "openCars" && id === "cars") || (step === "openUpgrades" && id === "upgrades");
+}
+
 export function App(props: {
   initialGame?: GameState;
   clockDriver?: ClockDriver;
@@ -65,6 +77,8 @@ export function App(props: {
   newSeed?: () => number;
   /** Offer the daily login reward (tests turn it off). Defaults to true. */
   dailyReward?: boolean;
+  /** Run the tutorial on a brand-new game (tests turn it off). Defaults to true. */
+  tutorial?: boolean;
 }) {
   // Storage and the saved game are read once, synchronously, before the first render.
   const [storage] = useState<SaveStorage | null>(() =>
@@ -78,12 +92,14 @@ export function App(props: {
     loadInitialState({
       storage,
       newSeed: props.newSeed ?? newSeed,
+      ...(props.tutorial === false ? { tutorial: false } : {}),
       ...(props.initialGame ? { initialGame: props.initialGame } : {}),
     }),
   );
   const [ui, dispatch] = useReducer(gameReducer, loaded.ui);
+  const tutorialStep = ui.tutorial;
   // The fleet drawer starts collapsed: the city and the side menus come first.
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(() => tutorialStep === "setPrice");
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Quality tier of the scene: it decides how much of the glass is blurred (see app.css).
   const [quality, setQuality] = useState<QualityTier>(() => initialTier(deviceHints()));
@@ -122,6 +138,8 @@ export function App(props: {
     game,
     speed: ui.speed,
     paused: ui.paused,
+    tutorial: ui.tutorial,
+    tutorialReplay: ui.tutorialReplay,
     initialStatus: loaded.status,
     pendingBackup: loaded.pendingBackup,
   });
@@ -169,36 +187,126 @@ export function App(props: {
     };
   }, [flush]);
 
-  const onTutorialNext = useCallback(() => {
-    dispatch({ type: "tutorialNext" });
+  // Side menus (side-menu.md). During the tutorial René decides what opens (tutorial.md).
+  const [panel, setPanel] = useState<PanelId | null>(() =>
+    tutorialStep === "buyUsed" ? "cars" : tutorialStep === "buyUpgrade" ? "upgrades" : null,
+  );
+  const onOpenPanel = useCallback(
+    (id: PanelId) => {
+      if (!menuAllowed(tutorialStep, id)) return;
+      setPanel((p) => (p === id ? null : id));
+    },
+    [tutorialStep],
+  );
+  const onClosePanel = useCallback(() => {
+    if (tutorialStep === "done") setPanel(null);
+  }, [tutorialStep]);
+  const onSetDrawerOpen = useCallback(
+    (open: boolean) => {
+      if (tutorialStep === "done" || (tutorialStep === "openFleet" && open)) setDrawerOpen(open);
+    },
+    [tutorialStep],
+  );
+  // Adjusted while rendering when the step changes (no effect, no cascading render): René opens
+  // the menu that holds the target, or closes what hides it, so no step is ever without an exit.
+  const [seenStep, setSeenStep] = useState(tutorialStep);
+  const [rene, setRene] = useState<ReneMode>(tutorialStep === "done" ? "hidden" : "idle");
+  if (seenStep !== tutorialStep) {
+    setSeenStep(tutorialStep);
+    switch (tutorialStep) {
+      case "welcome":
+      case "openCars":
+        setPanel(null);
+        setDrawerOpen(false);
+        break;
+      case "buyUsed":
+        setPanel("cars");
+        break;
+      case "setPrice":
+        setPanel(null);
+        setDrawerOpen(true);
+        break;
+      case "startTime":
+      case "speedUp":
+      case "watchCar":
+        setPanel(null);
+        setDrawerOpen(false);
+        break;
+      case "buyUpgrade":
+        setPanel("upgrades");
+        break;
+      case "openFleet":
+      case "openUpgrades":
+      case "missions":
+      case "dayEnd":
+      case "goodbye":
+        setPanel(null);
+        break;
+      case "done":
+        break;
+    }
+    // René cheers after every step, and walks away after the last one.
+    if (tutorialStep === "done") setRene(seenStep === "goodbye" ? "leave" : "hidden");
+    else if (seenStep === "done") setRene("idle");
+    else setRene("cheer");
+  }
+  useEffect(() => {
+    if (rene === "idle" || rene === "hidden") return undefined;
+    const timer = setTimeout(
+      () => {
+        setRene(rene === "cheer" ? "idle" : "hidden");
+      },
+      rene === "cheer" ? CHEER_MS : LEAVE_MS,
+    );
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [rene]);
+  // The tutorial listens to what the player opens (the reducer ignores what it does not expect).
+  useEffect(() => {
+    if (panel !== null && tutorialStep !== "done") {
+      dispatch({ type: "tutorialEvent", event: { type: "panelOpened", panel } });
+    }
+  }, [panel, tutorialStep]);
+  useEffect(() => {
+    if (drawerOpen && tutorialStep === "openFleet") {
+      dispatch({ type: "tutorialEvent", event: { type: "drawerOpened" } });
+    }
+  }, [drawerOpen, tutorialStep]);
+
+  const script =
+    tutorialStep === "done"
+      ? null
+      : tutorialScript(tutorialStep, { lastGain: ui.tutorialGain, report: game.lastDay });
+  const blocksTime = script?.blocksTime === true;
+  // The clock stays paused while the step needs the player's full attention.
+  useEffect(() => {
+    if (blocksTime && !ui.paused) dispatch({ type: "pause" });
+  }, [blocksTime, ui.paused]);
+  // Steps where time must run start it (e.g. after a reload, which always comes back paused).
+  useEffect(() => {
+    if (tutorialStep === "speedUp" || tutorialStep === "watchCar" || tutorialStep === "dayEnd") {
+      dispatch({ type: "resume" });
+    }
+  }, [tutorialStep]);
+  const [carTarget, setCarTarget] = useState<{ x: number; y: number } | null>(null);
+  const onDepartingCar = useCallback((p: { x: number; y: number } | null) => {
+    setCarTarget((prev) => {
+      if (p === null || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+      const x = Math.round(p.x);
+      const y = Math.round(p.y);
+      return prev !== null && prev.x === x && prev.y === y ? prev : { x, y };
+    });
+  }, []);
+  const onTutorialTap = useCallback(() => {
+    dispatch({ type: "tutorialEvent", event: { type: "tap" } });
   }, []);
   const onSkipTutorial = useCallback(() => {
     dispatch({ type: "skipTutorial" });
   }, []);
-  // Tutorial (tutorial.md): buying happens in the "Voitures" menu, pricing in the fleet drawer;
-  // the coach card sits next to those controls, under the HUD for the later steps.
-  const tutorialStep = ui.tutorial;
-  const coachInMenu = tutorialStep === "buy" || tutorialStep === "price";
-  // Side menus (side-menu.md). A brand-new agency opens on "Voitures" for its first purchase.
-  const [panel, setPanel] = useState<PanelId | null>(() =>
-    tutorialStep === "buy" ? "cars" : null,
-  );
-  const onOpenPanel = useCallback((id: PanelId) => {
-    setPanel((p) => (p === id ? null : id));
+  const onReplayTutorial = useCallback(() => {
+    dispatch({ type: "replayTutorial" });
   }, []);
-  const onClosePanel = useCallback(() => {
-    setPanel(null);
-  }, []);
-  // Adjusted while rendering when the step changes (no effect, no cascading render).
-  const [seenStep, setSeenStep] = useState(tutorialStep);
-  if (seenStep !== tutorialStep) {
-    setSeenStep(tutorialStep);
-    if (tutorialStep === "buy") setPanel("cars");
-    else if (tutorialStep === "price") {
-      setPanel(null);
-      setDrawerOpen(true);
-    } else if (tutorialStep === "run") setDrawerOpen(false);
-  }
 
   const onClaimMission = useCallback((slot: number) => {
     dispatch({ type: "claimMission", slot });
@@ -217,8 +325,8 @@ export function App(props: {
   const [checkout, setCheckout] = useState<ProductId | null>(null);
   const [liveBusy, setLiveBusy] = useState<ProductId | null>(null);
   const onOpenShop = useCallback(() => {
-    setShopOpen(true);
-  }, []);
+    if (tutorialStep === "done") setShopOpen(true);
+  }, [tutorialStep]);
   const onCloseShop = useCallback(() => {
     setShopOpen(false);
   }, []);
@@ -355,7 +463,7 @@ export function App(props: {
       ref={appRef}
       className="app"
       data-drawer={drawerOpen ? "open" : "peek"}
-      data-tutorial={ui.tutorial}
+      data-tutorial-step={tutorialStep}
       data-quality={quality}
       style={{ "--inset-top": `${String(insets.top)}px` } as CSSProperties}
     >
@@ -379,9 +487,6 @@ export function App(props: {
           onDismiss={autosave.dismissWarning}
         />
         <MessageBanner error={ui.error} notice={ui.notice} onDismiss={onDismissMessage} />
-        {!coachInMenu && (
-          <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
-        )}
       </div>
       <div className="stage">
         <ErrorBoundary fallback={<AgencyFallback />}>
@@ -392,13 +497,15 @@ export function App(props: {
             pendingRef={pendingRef}
             insets={insets}
             onQualityChange={setQuality}
+            rene={rene}
+            onDepartingCar={onDepartingCar}
           />
         </ErrorBoundary>
         <div className="banner-stack">
           {ui.dayBanner !== null && (
             <DayBanner text={ui.dayBanner} speed={ui.speed} onDismiss={onDismissBanner} />
           )}
-          {ui.eventBanner !== null && (
+          {ui.eventBanner !== null && tutorialStep === "done" && (
             <EventBanner
               text={ui.eventBanner}
               kind={activeEvent(game)?.kind ?? null}
@@ -413,11 +520,8 @@ export function App(props: {
         open={drawerOpen}
         fleetSize={game.fleet.length}
         capacity={capacity}
-        onSetOpen={setDrawerOpen}
+        onSetOpen={onSetDrawerOpen}
       >
-        {tutorialStep === "price" && (
-          <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
-        )}
         <FleetPanel fleet={game.fleet} onSetPrice={onSetPrice} />
       </ManageDrawer>
       <SideRail
@@ -445,9 +549,6 @@ export function App(props: {
         testId="panel-cars"
         onClose={onClosePanel}
       >
-        {tutorialStep === "buy" && (
-          <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
-        )}
         <BuyCarPanel
           cash={game.cash}
           fleetSize={game.fleet.length}
@@ -494,12 +595,13 @@ export function App(props: {
           onToggleMute={sound.toggleMute}
           onVolume={sound.setVolume}
           onNewGame={onAskNewGame}
+          onReplayTutorial={onReplayTutorial}
         />
       </PanelSheet>
       {confirmOpen && (
         <NewGameDialog game={game} onCancel={onCancelNewGame} onConfirm={onConfirmNewGame} />
       )}
-      {ui.offline !== null && !confirmOpen && (
+      {ui.offline !== null && tutorialStep === "done" && !confirmOpen && (
         <OfflineDialog report={ui.offline} onClaim={onClaimOffline} />
       )}
       {shopOpen && checkout === null && (
@@ -519,6 +621,16 @@ export function App(props: {
         <DailyRewardDialog
           streak={nextStreak(game.dailyReward, today)}
           onClaim={onClaimDailyReward}
+        />
+      )}
+      {tutorialStep !== "done" && script !== null && (
+        <TutorialOverlay
+          step={tutorialStep}
+          script={script}
+          carTarget={carTarget}
+          canSkip={ui.tutorialReplay}
+          onTap={onTutorialTap}
+          onSkip={onSkipTutorial}
         />
       )}
     </main>

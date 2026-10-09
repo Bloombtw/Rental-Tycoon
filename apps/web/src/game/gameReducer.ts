@@ -8,6 +8,8 @@ import {
   claimDailyReward,
   grantPurchase,
   createGame,
+  giveWelcomeGift,
+  upgradeCost,
   fireManager,
   hireManager,
   levelForXp,
@@ -40,7 +42,15 @@ import {
   missionNotice,
 } from "./messages.js";
 import { offlineDays, playOffline, type OfflineReport } from "./offline.js";
-import { initialTutorial, tutorialNext, type TutorialStep } from "./tutorial.js";
+import { departuresBetween } from "../scene/gains.js";
+import {
+  initialTutorial,
+  isUiTutorialEvent,
+  nextTutorialStep,
+  settleTutorial,
+  type TutorialEvent,
+  type TutorialStep,
+} from "./tutorial.js";
 
 export const DEFAULT_SEED = 1;
 
@@ -60,8 +70,12 @@ export interface UiState {
   readonly eventBanner: string | null;
   /** Result of the last absence, shown until the player taps "Récupérer". Already in `game`. */
   readonly offline: OfflineReport | null;
-  /** Guided first minute (tutorial.md); "done" once finished or skipped. */
+  /** Tutorial with René (tutorial.md); "done" once finished or skipped. */
   readonly tutorial: TutorialStep;
+  /** The tutorial is shown again on an advanced game: it may be skipped. */
+  readonly tutorialReplay: boolean;
+  /** Cents earned by the first car seen leaving during the tutorial (René comments on it). */
+  readonly tutorialGain: number | null;
 }
 
 export type GameAction =
@@ -89,8 +103,13 @@ export type GameAction =
   /** The player was away `elapsedMs` (closed app or background): play the offline days. */
   | { type: "returnAfter"; elapsedMs: number }
   | { type: "claimOffline" }
-  | { type: "tutorialNext" }
-  | { type: "skipTutorial" };
+  /** A UI event the tutorial listens to (tap, panel or drawer opened). */
+  | { type: "tutorialEvent"; event: TutorialEvent }
+  /** Only allowed when the tutorial is replayed. */
+  | { type: "skipTutorial" }
+  | { type: "replayTutorial" }
+  /** Starts the clock again without changing the speed (tutorial steps where time must run). */
+  | { type: "resume" };
 
 function isSeed(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 2 ** 32;
@@ -109,23 +128,98 @@ export function initUiState(game?: GameState): UiState {
     eventBanner: null,
     offline: null,
     tutorial: initialTutorial(g),
+    tutorialReplay: false,
+    tutorialGain: null,
   };
 }
 
-/** Moves the tutorial forward from what the action did (tutorial.md). */
+/** Tutorial events caused by what a successful action did (tutorial.md). */
+function tutorialEvents(prev: UiState, next: UiState, type: unknown): TutorialEvent[] {
+  switch (type) {
+    case "buyCar":
+      return next.error === null && next.game !== prev.game ? [{ type: "carBought" }] : [];
+    case "setCarPrice":
+      return next.error === null && next.game !== prev.game ? [{ type: "priceSet" }] : [];
+    case "buyUpgrade":
+      return next.error === null && next.game !== prev.game ? [{ type: "upgradeBought" }] : [];
+    case "setSpeed":
+      if (next === prev) return [];
+      return [
+        ...(prev.paused && !next.paused ? [{ type: "timeStarted" } as const] : []),
+        { type: "speedSet", speed: next.speed },
+      ];
+    case "togglePause":
+      return prev.paused && !next.paused ? [{ type: "timeStarted" }] : [];
+    case "advanceTime": {
+      if (next.game === prev.game) return [];
+      const events: TutorialEvent[] = [];
+      const first = departuresBetween(prev.game, next.game)[0];
+      if (first !== undefined) events.push({ type: "carDeparted", amount: first.amount });
+      if (next.game.day > prev.game.day) events.push({ type: "dayClosed" });
+      return events;
+    }
+    default:
+      return [];
+  }
+}
+
+function applyTutorialEvent(ui: UiState, event: TutorialEvent): UiState {
+  let gain = ui.tutorialGain;
+  if (
+    event.type === "carDeparted" &&
+    ui.tutorial === "watchCar" &&
+    gain === null &&
+    Number.isSafeInteger(event.amount) &&
+    event.amount >= 0
+  ) {
+    gain = event.amount;
+  }
+  // René only comments once he has seen a car leave: before that a tap does nothing.
+  if (event.type === "tap" && ui.tutorial === "watchCar" && gain === null) return ui;
+  const step = nextTutorialStep(ui.tutorial, event);
+  if (step === ui.tutorial && gain === ui.tutorialGain) return ui;
+  return { ...ui, tutorial: step, tutorialGain: gain };
+}
+
+/**
+ * Keeps the tutorial coherent with the game: skips what is already done or impossible, and gives
+ * René's welcome gift when the cash cannot pay the first upgrade (once: only the very first
+ * run, and only on that step, where nothing else can spend money).
+ */
+export function settleUi(ui: UiState): UiState {
+  if (ui.tutorial === "done") return ui.tutorialReplay ? { ...ui, tutorialReplay: false } : ui;
+  const step = settleTutorial(ui.tutorial, ui.game, ui.tutorialReplay);
+  let next: UiState = step === ui.tutorial ? ui : { ...ui, tutorial: step };
+  if (step === "buyUpgrade" && !ui.tutorialReplay) {
+    const missing = upgradeCost("ads", ui.game.upgrades.ads) - ui.game.cash;
+    if (missing > 0) {
+      try {
+        const game = giveWelcomeGift(ui.game, missing);
+        next = {
+          ...next,
+          game,
+          notice: `René complète la caisse : +${formatCents(game.cash - ui.game.cash)}.`,
+        };
+      } catch {
+        // an overflowing cash is far beyond the price: nothing to give
+      }
+    }
+  }
+  return next;
+}
+
 function advanceTutorial(prev: UiState, next: UiState, type: unknown): UiState {
-  let step = next.tutorial;
-  if (type === "skipTutorial") step = "done";
-  else if (type === "tutorialNext") step = tutorialNext(step);
-  else if (step === "buy" && next.game.fleet.length > 0) step = "price";
-  else if (step === "price" && type === "setCarPrice" && next.game !== prev.game) step = "run";
-  else if (step === "run" && !next.paused) step = "wait";
-  else if (step === "wait" && next.game.day > prev.game.day) step = "report";
-  return step === next.tutorial ? next : { ...next, tutorial: step };
+  let ui = next;
+  if (prev.tutorial !== "done") {
+    for (const event of tutorialEvents(prev, next, type)) ui = applyTutorialEvent(ui, event);
+  }
+  return settleUi(ui);
 }
 
 /** Plays the offline days of an absence; a second absence before the claim adds up. */
 function returnAfter(state: UiState, elapsedMs: unknown): UiState {
+  // No offline earnings while René is teaching: nothing runs behind the tutorial.
+  if (state.tutorial !== "done") return state;
   const played = playOffline(state.game, offlineDays(elapsedMs));
   if (played === null) return state;
   const prev = state.offline;
@@ -241,7 +335,7 @@ export function gameReducer(state: UiState, action: GameAction): UiState {
     const next = reduce(state, action);
     const type: unknown = (action as { type?: unknown } | null | undefined)?.type;
     // A new game restarts the tutorial from its own initial step.
-    return type === "newGame" ? next : advanceTutorial(state, next, type);
+    return type === "newGame" || next === state ? next : advanceTutorial(state, next, type);
   } catch {
     return state;
   }
@@ -259,6 +353,21 @@ function reduce(state: UiState, action: GameAction): UiState {
       return { ...state, notice: null, error: PURCHASE_FAILED_ERROR };
     case "returnAfter":
       return returnAfter(state, (action as { elapsedMs?: unknown }).elapsedMs);
+    case "tutorialEvent": {
+      const event: unknown = (action as { event?: unknown }).event;
+      if (state.tutorial === "done" || !isUiTutorialEvent(event)) return state;
+      return applyTutorialEvent(state, event);
+    }
+    case "skipTutorial":
+      return state.tutorial !== "done" && state.tutorialReplay
+        ? { ...state, tutorial: "done", tutorialReplay: false }
+        : state;
+    case "replayTutorial":
+      return state.tutorial === "done"
+        ? { ...state, tutorial: "welcome", tutorialReplay: true, tutorialGain: null, paused: true }
+        : state;
+    case "resume":
+      return state.paused ? { ...state, paused: false, hasRun: true } : state;
     case "claimOffline":
       return state.offline === null ? state : { ...state, offline: null };
     case "dismissMessage":

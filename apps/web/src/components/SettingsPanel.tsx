@@ -1,5 +1,6 @@
 import { useId } from "react";
 import type { AudioVolumes } from "../game/audio.js";
+import { Button } from "../ui/Button.js";
 import { Icon } from "../ui/icons.js";
 import { PanelHeader } from "../ui/PanelHeader.js";
 import { NewGameButton } from "./NewGameButton.js";
@@ -16,6 +17,8 @@ interface SettingsPanelProps {
   readonly onToggleMute: () => void;
   readonly onVolume: (kind: keyof AudioVolumes, value: number) => void;
   readonly onNewGame: () => void;
+  /** Shows René's tutorial again (tutorial.md). */
+  readonly onReplayTutorial: () => void;
 }
 
 /** Audio settings and game options (side-menu.md, sounds.md). */
@@ -25,6 +28,7 @@ export function SettingsPanel({
   onToggleMute,
   onVolume,
   onNewGame,
+  onReplayTutorial,
 }: SettingsPanelProps) {
   const baseId = useId();
   return (
@@ -70,6 +74,18 @@ export function SettingsPanel({
             </div>
           );
         })}
+      </section>
+      <section className="card panel" aria-labelledby={`${baseId}-help`}>
+        <PanelHeader icon="sparkle" tone="primary" id={`${baseId}-help`} title="Aide" />
+        <Button
+          variant="secondary"
+          size="lg"
+          icon="sparkle"
+          data-testid="replay-tutorial"
+          onClick={onReplayTutorial}
+        >
+          Revoir le tutoriel
+        </Button>
       </section>
       <NewGameButton onClick={onNewGame} />
     </>

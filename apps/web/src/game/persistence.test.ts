@@ -53,7 +53,14 @@ describe("browserSaveStorage", () => {
 describe("saveFormat", () => {
   it("round-trips game, speed and savedAt", () => {
     const r = decodeSave(encodeSave(played, 4, 1_700_000_000_000));
-    expect(r).toEqual({ kind: "ok", game: played, speed: 4, savedAt: 1_700_000_000_000 });
+    expect(r).toEqual({
+      kind: "ok",
+      game: played,
+      speed: 4,
+      savedAt: 1_700_000_000_000,
+      tutorial: "done",
+      tutorialReplay: false,
+    });
   });
   it("is empty for null", () => {
     expect(decodeSave(null)).toEqual({ kind: "empty" });

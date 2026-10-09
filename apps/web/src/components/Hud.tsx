@@ -80,7 +80,7 @@ function Report({
   );
   if (report === null) {
     return (
-      <p className="hud-report" data-testid="hud-report">
+      <p className="hud-report" data-testid="hud-report" data-tutorial="hud-report">
         {chip}
         Aucune journée écoulée.
         {todayPill}
@@ -91,7 +91,7 @@ function Report({
   const sign = net > 0 ? "positive" : net < 0 ? "negative" : "zero";
   const netText = `${net > 0 ? "+" : ""}${formatCents(net)}`;
   return (
-    <p className="hud-report" data-testid="hud-report" data-sign={sign}>
+    <p className="hud-report" data-testid="hud-report" data-tutorial="hud-report" data-sign={sign}>
       {chip}
       Hier : recettes {formatCents(report.revenue)} · charges {formatCents(report.costs)} · résultat{" "}
       <span className="hud-net">

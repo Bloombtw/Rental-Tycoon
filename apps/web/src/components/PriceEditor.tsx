@@ -43,7 +43,7 @@ export function PriceEditor({ carId, dailyPrice, onSubmit }: PriceEditorProps) {
 
   const errorId = `${inputId}-error`;
   return (
-    <form className="price-editor" onSubmit={submit} noValidate>
+    <form className="price-editor" data-tutorial="price-editor" onSubmit={submit} noValidate>
       <label htmlFor={inputId}>Prix par jour (€)</label>
       <div className="price-editor-row">
         <div

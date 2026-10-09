@@ -143,6 +143,9 @@ export const CUSTOMER_ASSETS: readonly AssetRef[] = Object.freeze(
   ),
 );
 
+/** René, the retiring manager of the tutorial (Kenney animated character). */
+export const RENE_ASSET: AssetRef = ref("characters", "character-male-b");
+
 /** The agency building is larger than its neighbours. */
 export const AGENCY_SCALE = 7;
 

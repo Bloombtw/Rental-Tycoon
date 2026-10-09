@@ -27,6 +27,7 @@ export function SpeedControls({
         icon={paused ? "play" : "pause"}
         className="speed-pause"
         data-testid="speed-pause"
+        data-tutorial="speed-pause"
         data-highlight={String(paused && !hasRun)}
         aria-pressed={paused}
         onClick={onTogglePause}
@@ -44,6 +45,7 @@ export function SpeedControls({
             type="button"
             className="speed-seg"
             data-testid={`speed-${s}`}
+            {...(s === 2 ? { "data-tutorial": "speed-fast" } : {})}
             data-active={String(s === speed)}
             aria-pressed={s === speed}
             onClick={() => {

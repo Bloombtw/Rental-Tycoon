@@ -113,13 +113,20 @@ function mountApp(initialGame?: GameState): void {
     initialGame ? (
       <App
         dailyReward={false}
+        tutorial={false}
         initialGame={initialGame}
         clockDriver={driver}
         storage={memoryStorage()}
         newSeed={() => 1}
       />
     ) : (
-      <App dailyReward={false} clockDriver={driver} storage={memoryStorage()} newSeed={() => 1} />
+      <App
+        dailyReward={false}
+        tutorial={false}
+        clockDriver={driver}
+        storage={memoryStorage()}
+        newSeed={() => 1}
+      />
     ),
   );
 }
@@ -222,7 +229,7 @@ describe("App: launch", () => {
   it("works under StrictMode (double reducer calls)", () => {
     mount(
       <StrictMode>
-        <App dailyReward={false} storage={memoryStorage()} newSeed={() => 1} />
+        <App dailyReward={false} tutorial={false} storage={memoryStorage()} newSeed={() => 1} />
       </StrictMode>,
     );
     clickId("buy-compact");
@@ -704,7 +711,13 @@ describe("App: hidden page and unmount", () => {
     root = createRoot(container);
     mount(
       <StrictMode>
-        <App dailyReward={false} clockDriver={driver} storage={memoryStorage()} newSeed={() => 1} />
+        <App
+          dailyReward={false}
+          tutorial={false}
+          clockDriver={driver}
+          storage={memoryStorage()}
+          newSeed={() => 1}
+        />
       </StrictMode>,
     );
     clickId("speed-10");
@@ -973,7 +986,12 @@ describe("ErrorBoundary", () => {
     } as unknown as GameState;
     mount(
       <ErrorBoundary>
-        <App dailyReward={false} initialGame={poisoned} storage={memoryStorage()} />
+        <App
+          dailyReward={false}
+          tutorial={false}
+          initialGame={poisoned}
+          storage={memoryStorage()}
+        />
       </ErrorBoundary>,
     );
     expect(container.innerHTML).not.toBe("");

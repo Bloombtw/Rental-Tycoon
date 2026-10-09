@@ -39,6 +39,7 @@ export const ManageDrawer = forwardRef<HTMLElement, ManageDrawerProps>(function 
         type="button"
         className="drawer-handle"
         data-testid="drawer-toggle"
+        data-tutorial="drawer-handle"
         aria-expanded={open}
         aria-controls="drawer-content"
         onPointerDown={(e) => {

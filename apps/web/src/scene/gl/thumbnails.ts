@@ -12,6 +12,7 @@ import {
   Group,
   HemisphereLight,
   Matrix4,
+  type Object3D,
   OrthographicCamera,
   Scene,
   SRGBColorSpace,
@@ -216,6 +217,88 @@ export function renderCarThumbnails(req: ThumbnailRequest): Map<CarAssetKey, str
     }
     return result;
   } finally {
+    renderer.setRenderTarget(previousTarget);
+    renderer.setClearColor(previousClear, previousAlpha);
+    target.dispose();
+  }
+}
+
+export interface PortraitRequest {
+  readonly renderer: WebGLRenderer;
+  /** A posed, ready-to-draw character, about `height` metres tall, feet at y = 0, facing +z. */
+  readonly model: Object3D;
+  readonly height: number;
+  readonly size: { readonly width: number; readonly height: number };
+}
+
+/** Share of the character's height at the bottom of the frame (belt) and at the top (above the head). */
+const PORTRAIT_FROM = 0.42;
+const PORTRAIT_TO = 1.13;
+/** Turn of the character towards the viewer's side (a three-quarter look). */
+const PORTRAIT_TURN = 0.3;
+
+/**
+ * Renders a bust portrait of a character as a transparent PNG data URL, on the scene's renderer.
+ * Throws on any failure (the caller falls back to the drawn portrait). Renderer state is restored.
+ */
+export function renderCharacterPortrait(req: PortraitRequest): string {
+  const { renderer, model } = req;
+  const width = Math.max(1, Math.min(1024, Math.floor(fin(req.size.width) ? req.size.width : 1)));
+  const height = Math.max(
+    1,
+    Math.min(1024, Math.floor(fin(req.size.height) ? req.size.height : 1)),
+  );
+  const h = fin(req.height) && req.height > 0 ? req.height : 1.7;
+  const previousTarget = renderer.getRenderTarget();
+  const previousClear = renderer.getClearColor(new Color());
+  const previousAlpha = renderer.getClearAlpha();
+  const target = new WebGLRenderTarget(width, height, {
+    samples: MSAA_SAMPLES,
+    colorSpace: SRGBColorSpace,
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const g = canvas.getContext("2d");
+  const scene = new Scene();
+  const light = lightAt(NOON_MINUTE);
+  const key = new DirectionalLight(new Color(light.sunColor), light.sunIntensity * 1.1);
+  key.position.set(3, 4, 6);
+  const hemi = new HemisphereLight(
+    new Color(light.hemiSky),
+    new Color(light.hemiGround),
+    light.hemiIntensity * 1.2,
+  );
+  const ambient = new AmbientLight(new Color(light.sunColor), light.ambientIntensity + 0.25);
+  scene.add(key, key.target, hemi, ambient);
+  const holder = new Group();
+  holder.rotation.y = PORTRAIT_TURN;
+  holder.add(model);
+  scene.add(holder);
+  const bottom = h * PORTRAIT_FROM;
+  const top = h * PORTRAIT_TO;
+  const halfH = (top - bottom) / 2;
+  const halfW = (halfH * width) / height;
+  const camera = new OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 50);
+  camera.position.set(0, (top + bottom) / 2 + 0.05, 8);
+  camera.lookAt(0, (top + bottom) / 2 - 0.02, 0);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
+  const pixels = new Uint8Array(width * height * 4);
+  try {
+    if (!g) throw new Error("no 2d context");
+    renderer.setClearColor(0, 0);
+    renderer.setRenderTarget(target);
+    renderer.clear();
+    renderer.render(scene, camera);
+    renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+    g.putImageData(new ImageData(toImageData(pixels, width, height), width, height), 0, 0);
+    const url = canvas.toDataURL("image/png");
+    if (!url.startsWith("data:image/png")) throw new Error("png encoding failed");
+    return url;
+  } finally {
+    holder.remove(model);
+    scene.remove(holder);
     renderer.setRenderTarget(previousTarget);
     renderer.setClearColor(previousClear, previousAlpha);
     target.dispose();

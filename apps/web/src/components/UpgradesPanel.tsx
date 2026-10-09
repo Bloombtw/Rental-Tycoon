@@ -94,6 +94,7 @@ export const UpgradesPanel = memo(function UpgradesPanel({
                 size="md"
                 className="upgrade-btn"
                 data-testid={`upgrade-buy-${id}`}
+                {...(id === "ads" ? { "data-tutorial": "upgrade-buy-ads" } : {})}
                 disabled={maxed || poor}
                 onClick={() => {
                   onBuy(id);

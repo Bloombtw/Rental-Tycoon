@@ -65,7 +65,9 @@ describe("initUiState", () => {
       dayBanner: null,
       eventBanner: null,
       offline: null,
-      tutorial: "buy", // a brand-new agency starts the tutorial
+      tutorial: "welcome", // a brand-new agency starts the tutorial
+      tutorialReplay: false,
+      tutorialGain: null,
     });
   });
 
@@ -566,7 +568,7 @@ describe("events (events.md)", () => {
   });
 
   it("the offline days and a new game clear the event banner", () => {
-    const withBanner: UiState = { ...running(), eventBanner: "x" };
+    const withBanner: UiState = { ...running(), tutorial: "done", eventBanner: "x" };
     expect(
       gameReducer(withBanner, { type: "returnAfter", elapsedMs: 3 * 60 * 60 * 1000 }).eventBanner,
     ).toBeNull();

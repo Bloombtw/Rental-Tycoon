@@ -1,6 +1,7 @@
 import { createGame, type GameState } from "@rt/sim";
 import { formatClock, type Speed } from "./clock.js";
-import { gameReducer, initUiState, type UiState } from "./gameReducer.js";
+import { gameReducer, initUiState, settleUi, type UiState } from "./gameReducer.js";
+import type { TutorialStep } from "./tutorial.js";
 import { resumeNotice, SAVE_CORRUPT_ERROR, SAVE_NEWER_ERROR } from "./messages.js";
 import { decodeSave, encodeSave, REJECTED_SAVE_KEY, SAVE_KEY } from "./saveFormat.js";
 import type { SaveStorage } from "./saveStorage.js";
@@ -31,11 +32,15 @@ export function loadInitialState(o: {
   initialGame?: GameState;
   /** Wall clock in ms (tests). Defaults to Date.now(). */
   now?: number;
+  /** false: a brand-new game skips the tutorial (tests). Defaults to true. */
+  tutorial?: boolean;
 }): InitResult {
-  const fresh = (): UiState => initUiState(createGame(o.newSeed()));
+  const noTutorial = (ui: UiState): UiState =>
+    o.tutorial === false ? { ...ui, tutorial: "done" } : ui;
+  const fresh = (): UiState => noTutorial(initUiState(createGame(o.newSeed())));
   const { storage } = o;
   if (o.initialGame) {
-    return { ui: initUiState(o.initialGame), status: storage ? "ok" : "unavailable" };
+    return { ui: noTutorial(initUiState(o.initialGame)), status: storage ? "ok" : "unavailable" };
   }
   if (!storage) return { ui: fresh(), status: "unavailable" };
 
@@ -50,11 +55,13 @@ export function loadInitialState(o: {
   if (decoded.kind === "empty") return { ui: fresh(), status: "ok" };
   if (decoded.kind === "ok") {
     const { game, speed, savedAt } = decoded;
-    const resumed: UiState = {
+    const resumed: UiState = settleUi({
       ...initUiState(game),
       speed,
+      tutorial: decoded.tutorial,
+      tutorialReplay: decoded.tutorialReplay,
       notice: resumeNotice(formatClock(game.day, game.minute)),
-    };
+    });
     // Offline earnings for the time the app was closed (a future savedAt gives nothing).
     const now = o.now ?? Date.now();
     const ui =
@@ -96,10 +103,12 @@ export function writeSave(
   game: GameState,
   speed: Speed,
   now: number,
+  tutorial: TutorialStep = "done",
+  tutorialReplay = false,
 ): SaveStatus {
   if (!storage) return "unavailable";
   try {
-    storage.setItem(SAVE_KEY, encodeSave(game, speed, now));
+    storage.setItem(SAVE_KEY, encodeSave(game, speed, now, tutorial, tutorialReplay));
     return "ok";
   } catch {
     return "failed";

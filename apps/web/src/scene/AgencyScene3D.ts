@@ -36,6 +36,7 @@ import { WHEEL_RADIUS, carPoseAt, type CarPose } from "./carMotion.js";
 import { computeCityPlan, type CityPlan } from "./cityPlan.js";
 import { CarInstancer, RentedDots } from "./gl/carInstances.js";
 import { People } from "./gl/people.js";
+import { Rene, type ReneMode } from "./gl/rene.js";
 import { customerPosesAt } from "./customers.js";
 import { buildCityMesh, type CityMesh } from "./gl/cityMesh.js";
 import { assetKey, disposeTemplates, loadTemplates, type Template } from "./gl/loader.js";
@@ -98,6 +99,8 @@ function applyRendererTier(renderer: WebGLRenderer, tier: QualityTier): void {
   renderer.shadowMap.type = shadowType(s.softShadows);
 }
 
+export type { ReneMode };
+
 export class AgencyScene3D {
   private readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
@@ -116,6 +119,7 @@ export class AgencyScene3D {
   private readonly signTexture: CanvasTexture;
   private readonly instancer: CarInstancer;
   private readonly people: People;
+  private readonly rene: Rene;
   private readonly dots: RentedDots;
   private city: CityMesh | null = null;
   private night: NightLights | null = null;
@@ -208,6 +212,8 @@ export class AgencyScene3D {
       MAX_FLEET_SIZE,
     );
     this.people = new People(this.carLayer);
+    this.rene = new Rene(this.carLayer);
+    this.rene.setReducedMotion(opts.reducedMotion);
     this.applyLight(0);
 
     renderer.domElement.addEventListener("webglcontextlost", this.onContextLost);
@@ -245,6 +251,7 @@ export class AgencyScene3D {
       const scene = new AgencyScene3D(renderer, templates, o, tier);
       // Customers load in the background: the city is playable before they arrive.
       void scene.people.load(o.baseUrl, o.isCancelled);
+      void scene.rene.load(o.baseUrl, o.isCancelled);
       return scene;
     } catch (error) {
       if (templates) disposeTemplates(templates);
@@ -307,6 +314,27 @@ export class AgencyScene3D {
 
   setReducedMotion(value: boolean): void {
     this.reducedMotion = value;
+    this.rene.setReducedMotion(value);
+  }
+
+  /**
+   * René, the tutorial guide, in front of the agency: "idle" waits, "cheer" plays emote-yes then
+   * goes back to idle, "leave" walks away and disappears, "hidden" removes him.
+   */
+  setRene(mode: ReneMode): void {
+    if (this.destroyed) return;
+    this.rene.setMode(mode);
+  }
+
+  /** True while René is on screen: the host keeps drawing frames even if the clock is paused. */
+  reneActive(): boolean {
+    return !this.destroyed && this.rene.active;
+  }
+
+  /** Renders René's bust portrait as a transparent PNG data URL (same renderer, no second context). */
+  renderRenePortrait(size: { width: number; height: number }): Promise<string> {
+    if (this.destroyed || this.failed) return Promise.reject(new Error("scene unavailable"));
+    return this.rene.renderPortrait(this.renderer, size);
   }
 
   setHighlight(index: number | null): void {
@@ -435,7 +463,7 @@ export class AgencyScene3D {
 
   update(game: GameState, timeOfDay: number, layout: AgencyLayout, ambientSeconds: number): void {
     if (this.destroyed) return;
-    this.animating = ambientSeconds !== this.lastAmbient;
+    this.animating = ambientSeconds !== this.lastAmbient || this.rene.active;
     this.lastAmbient = ambientSeconds;
     const plan = this.planFor(layout);
     const routes = this.routesFor(layout, plan);
@@ -484,6 +512,8 @@ export class AgencyScene3D {
       ),
       ambientSeconds,
     );
+
+    this.rene.update(layout, typeof performance !== "undefined" ? performance.now() : 0);
 
     this.instancer.end();
     this.dots.end();
@@ -596,6 +626,7 @@ export class AgencyScene3D {
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
     this.instancer.dispose();
     this.people.dispose();
+    this.rene.dispose();
     this.dots.dispose();
     this.night?.dispose();
     this.city?.dispose();

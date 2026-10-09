@@ -123,6 +123,7 @@ export const BuyCarPanel = memo(function BuyCarPanel({
                 icon={locked ? "lock" : "cart"}
                 className="buy-btn"
                 data-testid={`buy-${id}`}
+                {...(id === "used" ? { "data-tutorial": "buy-used" } : {})}
                 disabled={reason !== null}
                 aria-describedby={reason !== null ? `${baseId}-${id}-refusal` : undefined}
                 onClick={() => {

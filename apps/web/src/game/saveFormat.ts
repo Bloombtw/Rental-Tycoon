@@ -5,6 +5,7 @@ import {
   type GameState,
 } from "@rt/sim";
 import { isSpeed, type Speed } from "./clock.js";
+import { isTutorialStep, type TutorialStep } from "./tutorial.js";
 
 export const SAVE_KEY = "rental-tycoon/save";
 export const REJECTED_SAVE_KEY = "rental-tycoon/save-rejected";
@@ -19,14 +20,31 @@ export interface SaveEnvelope {
   savedAt: number | null;
   speed: Speed;
   game: GameState;
+  /** Tutorial step (tutorial.md). Missing in saves from before the tutorial: counts as "done". */
+  tutorial?: TutorialStep;
+  /** Present (true) while the tutorial is replayed on an advanced game. */
+  tutorialReplay?: boolean;
 }
 
 export type DecodeResult =
   | { kind: "empty" }
-  | { kind: "ok"; game: GameState; speed: Speed; savedAt: number | null }
+  | {
+      kind: "ok";
+      game: GameState;
+      speed: Speed;
+      savedAt: number | null;
+      tutorial: TutorialStep;
+      tutorialReplay: boolean;
+    }
   | { kind: "rejected"; reason: "corrupt" | "newer" };
 
-export function encodeSave(game: GameState, speed: Speed, savedAt: number): string {
+export function encodeSave(
+  game: GameState,
+  speed: Speed,
+  savedAt: number,
+  tutorial: TutorialStep = "done",
+  tutorialReplay = false,
+): string {
   const envelope: SaveEnvelope = {
     kind: "rental-tycoon-save",
     version: SAVE_FORMAT_VERSION,
@@ -34,6 +52,8 @@ export function encodeSave(game: GameState, speed: Speed, savedAt: number): stri
     savedAt: Number.isSafeInteger(savedAt) && savedAt >= 0 ? savedAt : null,
     speed: isSpeed(speed) ? speed : 1,
     game,
+    tutorial: isTutorialStep(tutorial) ? tutorial : "done",
+    ...(tutorialReplay === true && tutorial !== "done" ? { tutorialReplay: true } : {}),
   };
   return JSON.stringify(envelope);
 }
@@ -57,11 +77,16 @@ export function decodeSave(raw: string | null): DecodeResult {
     const game = restoreGameState(env["game"], env["stateVersion"]);
     const at = env["savedAt"];
     const speed = env["speed"];
+    const step = env["tutorial"];
+    // A missing (old save) or unknown step never traps the player in a tutorial.
+    const tutorial: TutorialStep = isTutorialStep(step) ? step : "done";
     return {
       kind: "ok",
       game,
       speed: isSpeed(speed) ? speed : 1,
       savedAt: typeof at === "number" && Number.isSafeInteger(at) && at >= 0 ? at : null,
+      tutorial,
+      tutorialReplay: tutorial !== "done" && env["tutorialReplay"] === true,
     };
   } catch (err) {
     if (err instanceof UnsupportedGameStateVersionError && err.newer) {
