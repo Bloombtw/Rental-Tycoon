@@ -417,6 +417,7 @@ export function App(props: {
         onClick={onOpenShop}
       >
         <Icon name="shop" size={24} />
+        <span className="shop-fab-label">Boutique</span>
         <span className="shop-fab-gems">
           <Icon name="gem" size={16} />
           {game.shop.gems}

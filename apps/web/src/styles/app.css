@@ -2421,3 +2421,8 @@ input {
   font-weight: var(--fw-bold);
   animation: pop-in var(--dur-base) var(--ease-spring);
 }
+
+.shop-fab-label {
+  font-size: 11px;
+  line-height: 1;
+}

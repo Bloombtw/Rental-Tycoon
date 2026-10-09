@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
+import { registerPwa } from "./pwa.js";
 import "./styles/tokens.css";
 import "./styles/app.css";
 
@@ -14,3 +15,4 @@ createRoot(root).render(
     </ErrorBoundary>
   </StrictMode>,
 );
+registerPwa();
