@@ -1,5 +1,7 @@
-import { useRef, type ReactNode } from "react";
+import { forwardRef, useRef, type ReactNode } from "react";
 import { MAX_FLEET_SIZE } from "@rt/sim";
+import { Icon } from "../ui/icons.js";
+import { ProgressBar } from "../ui/ProgressBar.js";
 
 /** Vertical drag (px) on the handle that collapses / expands the sheet. */
 const DRAG_THRESHOLD_PX = 40;
@@ -13,13 +15,21 @@ interface ManageDrawerProps {
   readonly children: ReactNode;
 }
 
-/** Bottom sheet on phones, side panel on wide landscape screens. */
-export function ManageDrawer({ open, fleetSize, onSetOpen, children }: ManageDrawerProps) {
+/** Floating glass bottom sheet on phones, floating side panel on wide landscape screens. */
+export const ManageDrawer = forwardRef<HTMLElement, ManageDrawerProps>(function ManageDrawer(
+  { open, fleetSize, onSetOpen, children },
+  ref,
+) {
   const startY = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const size = Number.isSafeInteger(fleetSize) && fleetSize >= 0 ? fleetSize : 0;
   return (
-    <aside className="drawer" data-state={open ? "open" : "peek"} data-testid="drawer">
+    <aside
+      ref={ref}
+      className="drawer glass-light"
+      data-state={open ? "open" : "peek"}
+      data-testid="drawer"
+    >
       <button
         type="button"
         className="drawer-handle"
@@ -51,10 +61,22 @@ export function ManageDrawer({ open, fleetSize, onSetOpen, children }: ManageDra
       >
         <span className="drawer-grip" aria-hidden="true" />
         <span className="drawer-title">
-          Gérer l'agence · Flotte {size}/{MAX_FLEET_SIZE}
+          <Icon name="fleet" size={20} className="drawer-title-icon" />
+          <span className="drawer-title-text">
+            Gérer l'agence · Flotte {size}/{MAX_FLEET_SIZE}
+          </span>
+          <span className="drawer-fleet-bar" aria-hidden="true">
+            <ProgressBar
+              value={size}
+              max={MAX_FLEET_SIZE}
+              label="Remplissage de la flotte"
+              tone="money"
+              thin
+            />
+          </span>
         </span>
         <span className="drawer-chevron" aria-hidden="true">
-          {open ? "▾" : "▴"}
+          <Icon name="chevron-up" size={24} />
         </span>
       </button>
       <div className="drawer-content" id="drawer-content" hidden={!open}>
@@ -62,4 +84,4 @@ export function ManageDrawer({ open, fleetSize, onSetOpen, children }: ManageDra
       </div>
     </aside>
   );
-}
+});

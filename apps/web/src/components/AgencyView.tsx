@@ -7,13 +7,17 @@ import {
 } from "react";
 import type { GameState } from "@rt/sim";
 import { previewClock } from "../game/clock.js";
+import { deviceHints } from "../game/deviceHints.js";
 import {
+  NO_INSETS,
   clampCamera,
-  fitCamera,
+  clampInsets,
+  fitCameraInRect,
   panBy,
   wheelZoomFactor,
   zoomAt,
   type Camera,
+  type ObscuredInsets,
   type ScreenRect,
 } from "../scene/camera.js";
 import { carIndexAt } from "../scene/carMotion.js";
@@ -37,6 +41,10 @@ import {
 } from "../scene/quality.js";
 import { advanceAmbient } from "../scene/traffic.js";
 import type { AgencyScene3D } from "../scene/AgencyScene3D.js";
+import { Button } from "../ui/Button.js";
+import { CarIllustration, Icon } from "../ui/icons.js";
+import { ProgressBar } from "../ui/ProgressBar.js";
+import { failThumbnails, getThumbnailState, publishThumbnails } from "../ui/thumbnailStore.js";
 import { CarTooltip } from "./CarTooltip.js";
 
 type AgencyScene = AgencyScene3D;
@@ -49,7 +57,22 @@ interface AgencyViewProps {
   readonly speed: number;
   /** Fractional minutes not yet committed, for interpolation. */
   readonly pendingRef: { readonly current: number };
+  /**
+   * Parts of the view hidden under the floating HUD and sheet: the overview frames the agency in
+   * the free rectangle. Panning, pinching and taps stay computed on the whole canvas.
+   * Defaults to no insets.
+   */
+  readonly insets?: ObscuredInsets;
+  /** Called with the tier in use once the scene exists and whenever it drops. */
+  readonly onQualityChange?: (tier: QualityTier) => void;
 }
+
+/** Size of the thumbnails rendered by the scene (shown at 160 x 120 CSS px at most, x2). */
+const THUMBNAIL_SIZE = { width: 320, height: 240 } as const;
+const THUMBNAIL_KEYS = ["used", "compact", "hybrid"] as const;
+/** Longest wait for an idle moment before rendering the thumbnails. */
+const THUMBNAIL_IDLE_TIMEOUT_MS = 2000;
+const THUMBNAIL_FALLBACK_DELAY_MS = 500;
 
 type ViewStatus = "loading" | "ready" | "fallback";
 
@@ -62,7 +85,8 @@ interface TooltipState {
 export function AgencyFallback() {
   return (
     <div className="agency-fallback" data-testid="agency-fallback" role="note">
-      Vue de l'agence indisponible sur cet appareil. Utilisez le panneau « Gérer l'agence ».
+      <CarIllustration tint="compact" className="agency-fallback-illu" />
+      <p>Vue de l'agence indisponible sur cet appareil. Utilisez le panneau « Gérer l'agence ».</p>
     </div>
   );
 }
@@ -73,13 +97,18 @@ function reducedMotionQuery(): MediaQueryList | null {
     : null;
 }
 
+/** Writes a data attribute only when it changes: an attribute write invalidates style every frame. */
+function setData(el: HTMLElement, key: string, value: string): void {
+  if (el.dataset[key] !== value) el.dataset[key] = value;
+}
+
 /** Diagnostic attributes are refreshed at most this often. */
 const DIAGNOSTIC_INTERVAL_MS = 500;
 
-function deviceHints(): { hardwareConcurrency?: unknown; deviceMemory?: unknown } {
-  if (typeof navigator === "undefined") return {};
-  const nav = navigator as Navigator & { deviceMemory?: unknown };
-  return { hardwareConcurrency: nav.hardwareConcurrency, deviceMemory: nav.deviceMemory };
+function loadingPercent(progress: { loaded: number; total: number }): number {
+  if (!Number.isFinite(progress.loaded) || !Number.isFinite(progress.total)) return 0;
+  if (!(progress.total > 0)) return 0;
+  return Math.min(100, Math.max(0, Math.round((progress.loaded / progress.total) * 100)));
 }
 
 function loadingText(progress: { loaded: number; total: number }): string {
@@ -90,7 +119,14 @@ function loadingText(progress: { loaded: number; total: number }): string {
   return `Chargement de la ville… ${String(pct)} %`;
 }
 
-export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps) {
+export function AgencyView({
+  game,
+  paused,
+  speed,
+  pendingRef,
+  insets = NO_INSETS,
+  onQualityChange,
+}: AgencyViewProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<ViewStatus>(() => (detectWebGL() ? "loading" : "fallback"));
   const resetRef = useRef<(() => void) | null>(null);
@@ -110,6 +146,8 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
   const tooltipRef = useRef<TooltipState | null>(null);
   const speedRef = useRef(speed);
   const ambientRef = useRef(0);
+  const insetsRef = useRef(insets);
+  const qualityCbRef = useRef(onQualityChange);
   const [progress, setProgress] = useState({ loaded: 0, total: 0 });
 
   useEffect(() => {
@@ -117,6 +155,8 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
     pausedRef.current = paused;
     speedRef.current = speed;
     tooltipRef.current = tooltip;
+    insetsRef.current = insets;
+    qualityCbRef.current = onQualityChange;
   });
 
   // Scene lifetime: detect WebGL, load Three.js lazily, build the scene, clean up completely.
@@ -132,8 +172,56 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
     let monitor: FrameMonitor = INITIAL_MONITOR;
     let lastFrame: number | null = null;
     let lastDiagnostics = Number.NEGATIVE_INFINITY;
+    let thumbnailTimer: { kind: "idle" | "timeout"; id: number } | null = null;
+
+    const cancelThumbnails = (): void => {
+      if (thumbnailTimer === null) return;
+      if (thumbnailTimer.kind === "idle") {
+        if (typeof cancelIdleCallback === "function") cancelIdleCallback(thumbnailTimer.id);
+      } else {
+        clearTimeout(thumbnailTimer.id);
+      }
+      thumbnailTimer = null;
+    };
+
+    /** Renders the car thumbnails once, when the browser is idle and nobody is dragging. */
+    const scheduleThumbnails = (): void => {
+      if (cancelled || getThumbnailState().status === "ready") return;
+      const run = (): void => {
+        thumbnailTimer = null;
+        const s = scene;
+        if (cancelled || s === null) return;
+        if (gestureRef.current.mode !== "idle") {
+          thumbnailTimer = {
+            kind: "timeout",
+            id: window.setTimeout(run, THUMBNAIL_FALLBACK_DELAY_MS),
+          };
+          return;
+        }
+        try {
+          s.renderThumbnails(THUMBNAIL_KEYS, THUMBNAIL_SIZE).then(
+            publishThumbnails,
+            failThumbnails,
+          );
+        } catch {
+          failThumbnails();
+        }
+      };
+      if (typeof requestIdleCallback === "function") {
+        thumbnailTimer = {
+          kind: "idle",
+          id: requestIdleCallback(run, { timeout: THUMBNAIL_IDLE_TIMEOUT_MS }),
+        };
+      } else {
+        thumbnailTimer = {
+          kind: "timeout",
+          id: window.setTimeout(run, THUMBNAIL_FALLBACK_DELAY_MS),
+        };
+      }
+    };
 
     const teardown = (): void => {
+      cancelThumbnails();
       if (raf !== null) cancelAnimationFrame(raf);
       raf = null;
       observer?.disconnect();
@@ -174,24 +262,25 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
         const key = `${count}:${view.width}:${view.height}`;
         const layout = cached?.key === key ? cached.layout : computeLayout(count, view);
         if (cached?.key !== key) layoutRef.current = { key, layout };
+        const free = insetsRef.current;
         let cam = cameraRef.current;
         cam =
           !userMovedRef.current || cam === null
-            ? fitCamera(layout.bounds, view)
-            : clampCamera(cam, layout.bounds, view);
+            ? fitCameraInRect(layout.bounds, view, free)
+            : clampCamera(cam, layout.bounds, view, free);
         cameraRef.current = cam;
         scene.update(preview.game, preview.timeOfDay, layout, ambientRef.current);
         scene.setCamera(cam, view);
         scene.render();
-        host.dataset["carSprites"] = String(scene.posesNow().length);
-        host.dataset["quality"] = tier;
+        setData(host, "carSprites", String(scene.posesNow().length));
+        setData(host, "quality", tier);
         const now = performance.now();
         if (now - lastDiagnostics >= DIAGNOSTIC_INTERVAL_MS) {
           lastDiagnostics = now;
           const stats = scene.stats();
-          host.dataset["traffic"] = String(stats.traffic);
-          host.dataset["drawCalls"] = String(stats.calls);
-          host.dataset["triangles"] = String(stats.triangles);
+          setData(host, "traffic", String(stats.traffic));
+          setData(host, "drawCalls", String(stats.calls));
+          setData(host, "triangles", String(stats.triangles));
         }
       } catch {
         fail();
@@ -216,6 +305,7 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
               fail();
               return;
             }
+            qualityCbRef.current?.(tier);
           }
         }
       }
@@ -247,7 +337,12 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
       const layout = layoutRef.current?.layout;
       if (!layout) return;
       const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-      cameraRef.current = clampCamera(zoomAt(cam, view, factor, anchor), layout.bounds, view);
+      cameraRef.current = clampCamera(
+        zoomAt(cam, view, factor, anchor),
+        layout.bounds,
+        view,
+        insetsRef.current,
+      );
       userMovedRef.current = true;
       setTooltip(null);
       draw();
@@ -280,7 +375,12 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
       const view: ScreenRect = { x: 0, y: 0, width: rect.width, height: rect.height };
       switch (effect.type) {
         case "pan":
-          cameraRef.current = clampCamera(panBy(cam, effect.dx, effect.dy), layout.bounds, view);
+          cameraRef.current = clampCamera(
+            panBy(cam, effect.dx, effect.dy),
+            layout.bounds,
+            view,
+            insetsRef.current,
+          );
           userMovedRef.current = true;
           setTooltip(null);
           draw();
@@ -291,6 +391,7 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
             zoomAt(moved, view, effect.factor, effect.anchor),
             layout.bounds,
             view,
+            insetsRef.current,
           );
           userMovedRef.current = true;
           setTooltip(null);
@@ -315,7 +416,10 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
       }
     };
 
-    if (!detectWebGL()) return undefined;
+    if (!detectWebGL()) {
+      failThumbnails();
+      return undefined;
+    }
 
     const initial = measure();
     setSize(initial);
@@ -347,6 +451,7 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
         sceneRef.current = created;
         // The scene may have lowered the tier (small GPU textures): start from the real one.
         tier = created.quality();
+        qualityCbRef.current?.(tier);
         created.onFailure(fail);
         host.addEventListener("wheel", onWheel, { passive: false });
         motion?.addEventListener("change", onMotionChange);
@@ -357,6 +462,7 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
         setStatus("ready");
         draw();
         syncLoop();
+        scheduleThumbnails();
       })
       .catch(() => {
         if (!cancelled) fail();
@@ -372,10 +478,12 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
     };
   }, [pendingRef]);
 
-  // Redraw / restart the loop whenever the game or the pause state changes.
+  // Redraw / restart the loop whenever the game, the pause state or the free area changes.
   useEffect(() => {
     drawRef.current?.();
-  }, [game, paused, status]);
+  }, [game, paused, status, insets]);
+
+  const freeInsets = clampInsets(insets, size);
 
   useEffect(() => {
     sceneRef.current?.setHighlight(tooltip?.index ?? null);
@@ -440,16 +548,26 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
     >
       {status === "loading" && (
         <div className="agency-loading" data-testid="agency-loading" role="status">
-          {loadingText(progress)}
+          <Icon name="car" size={32} className="loading-car" />
+          <span className="loading-text">{loadingText(progress)}</span>
+          <ProgressBar
+            value={loadingPercent(progress)}
+            max={100}
+            label="Chargement de la ville"
+            tone="primary"
+          />
         </div>
       )}
       {status === "fallback" && <AgencyFallback />}
       {status === "ready" && (
-        <button
-          type="button"
-          className="btn camera-reset"
+        <Button
+          variant="glass"
+          size="icon"
+          icon="recenter"
+          className="camera-reset"
           data-testid="camera-reset"
           aria-label="Recentrer la vue"
+          style={{ bottom: `calc(${String(freeInsets.bottom)}px + var(--space-4))` }}
           onPointerDown={(e) => {
             e.stopPropagation();
           }}
@@ -460,12 +578,17 @@ export function AgencyView({ game, paused, speed, pendingRef }: AgencyViewProps)
             resetRef.current?.();
             setTooltip(null);
           }}
-        >
-          ⌖
-        </button>
+        />
       )}
       {status === "ready" && tooltip !== null && content !== null && (
-        <CarTooltip content={content} x={tooltip.x} y={tooltip.y} bounds={size} />
+        <CarTooltip
+          content={content}
+          x={tooltip.x}
+          y={tooltip.y}
+          bounds={size}
+          insets={freeInsets}
+          model={car?.model}
+        />
       )}
     </div>
   );

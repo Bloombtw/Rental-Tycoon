@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Icon } from "../ui/icons.js";
 
 interface ErrorBoundaryProps {
   readonly children?: ReactNode;
@@ -26,9 +27,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.failed) {
       if (this.props.fallback !== undefined) return this.props.fallback;
       return (
-        <main className="app error-fallback" role="alert" data-testid="error-fallback">
-          <h1>Oups</h1>
-          <p>Une erreur inattendue est survenue. Rechargez la page pour recommencer.</p>
+        <main className="error-fallback" role="alert" data-testid="error-fallback">
+          <div className="error-card">
+            <span className="error-badge" aria-hidden="true">
+              <Icon name="alert" size={48} />
+            </span>
+            <h1>Oups</h1>
+            <p>Une erreur inattendue est survenue. Rechargez la page pour recommencer.</p>
+          </div>
         </main>
       );
     }

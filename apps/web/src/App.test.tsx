@@ -344,8 +344,9 @@ describe("App: purchase and day flow", () => {
   it("dismissing the banner removes it", () => {
     mountApp();
     clickId("buy-compact");
+    // The close control is an icon button: same accessible name, no visible text.
     const close = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "Fermer",
+      (b) => b.getAttribute("aria-label") === "Fermer",
     );
     expect(close).toBeDefined();
     click(close as HTMLElement);
@@ -559,7 +560,7 @@ describe("App: days go by", () => {
       container.querySelector('[data-testid="agency-view"]')?.getAttribute("data-car-sprites"),
     ).toBe(String(MAX_FLEET_SIZE));
     assertClean();
-  });
+  }, 20_000); // ~2160 committed frames rendering the full HUD: slow under jsdom
 
   it("a long hung frame at x10 never skips a closing: the report is still consistent", () => {
     mountApp(createGame(1, 0, IDLE));
