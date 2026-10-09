@@ -16,7 +16,9 @@ export type SimErrorCode =
   | "UNSUPPORTED_STATE_VERSION"
   | "UNKNOWN_UPGRADE"
   | "UPGRADE_MAXED"
-  | "MODEL_LOCKED";
+  | "MODEL_LOCKED"
+  | "UNKNOWN_MANAGER"
+  | "MANAGER_STATE";
 
 /** Base class of every typed sim error. Extends RangeError for compatibility. */
 export abstract class SimError extends RangeError {
@@ -141,6 +143,31 @@ export class FleetFullError extends SimError {
     super("the fleet is full");
     this.name = "FleetFullError";
     this.maxFleetSize = maxFleetSize;
+  }
+}
+
+export class UnknownManagerError extends SimError {
+  readonly code = "UNKNOWN_MANAGER" as const;
+  readonly manager: unknown;
+
+  constructor(manager: unknown) {
+    super("unknown manager");
+    this.name = "UnknownManagerError";
+    this.manager = manager;
+  }
+}
+
+/** Hiring someone already hired, or firing someone who is not. */
+export class ManagerStateError extends SimError {
+  readonly code = "MANAGER_STATE" as const;
+  readonly manager: string;
+  readonly alreadyHired: boolean;
+
+  constructor(manager: string, alreadyHired: boolean) {
+    super(alreadyHired ? "manager already hired" : "manager not hired");
+    this.name = "ManagerStateError";
+    this.manager = manager;
+    this.alreadyHired = alreadyHired;
   }
 }
 

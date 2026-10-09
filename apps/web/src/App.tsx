@@ -6,8 +6,10 @@ import {
   type CarModelId,
   type Cents,
   type GameState,
+  type ManagerId,
   type UpgradeId,
 } from "@rt/sim";
+import { ManagersPanel } from "./components/ManagersPanel.js";
 import { UpgradesPanel } from "./components/UpgradesPanel.js";
 import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
 import { BuyCarPanel } from "./components/BuyCarPanel.js";
@@ -184,6 +186,12 @@ export function App(props: {
   const onBuy = useCallback((model: CarModelId) => {
     dispatch({ type: "buyCar", model });
   }, []);
+  const onHireManager = useCallback((manager: ManagerId) => {
+    dispatch({ type: "hireManager", manager });
+  }, []);
+  const onFireManager = useCallback((manager: ManagerId) => {
+    dispatch({ type: "fireManager", manager });
+  }, []);
   const onBuyUpgrade = useCallback((upgrade: UpgradeId) => {
     dispatch({ type: "buyUpgrade", upgrade });
   }, []);
@@ -259,6 +267,13 @@ export function App(props: {
           onBuy={onBuy}
         />
         <UpgradesPanel cash={game.cash} upgrades={game.upgrades} onBuy={onBuyUpgrade} />
+        <ManagersPanel
+          cash={game.cash}
+          xp={game.xp}
+          managers={game.managers}
+          onHire={onHireManager}
+          onFire={onFireManager}
+        />
         <NewGameButton onClick={onAskNewGame} />
       </ManageDrawer>
       {confirmOpen && (

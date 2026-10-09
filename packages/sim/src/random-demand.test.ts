@@ -52,7 +52,7 @@ describe("constants", () => {
     expect(DEMAND_MIN_PCT).toBe(70);
     expect(DEMAND_MAX_PCT).toBe(115);
     expect(FIXTURE_REFERENCE_PRICE).toBe(90_00);
-    expect(GAME_STATE_VERSION).toBe(4); // v3: upgrades, v4: xp
+    expect(GAME_STATE_VERSION).toBe(5); // v3: upgrades, v4: xp, v5: managers
     expect([...RENTAL_OUTCOMES]).toEqual(["rented", "tooExpensive", "noCustomer"]);
   });
 });
@@ -359,8 +359,8 @@ describe("save: version 2 (acceptance criterion 5)", () => {
     expect(() => restoreGameState(s, 2)).toThrow(InvalidGameStateError);
   });
 
-  // 85 = one above the most a day can draw (full fleet, max advertising).
-  it.each([-1, 1.5, 85, 1e9, NaN, Infinity, null, "3", true, {}, [], 2 ** 53])(
+  // 92 = one above the most a day can draw (full fleet, max advertising, sales manager).
+  it.each([-1, 1.5, 92, 1e9, NaN, Infinity, null, "3", true, {}, [], 2 ** 53])(
     "rejects customersLeft = %s",
     (bad) => {
       const s = json(played());

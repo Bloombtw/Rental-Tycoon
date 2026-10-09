@@ -746,19 +746,23 @@ describe("tick: revenue", () => {
     expect(t.fleet.map((c) => c.id)).toEqual(g.fleet.map((c) => c.id));
     expect(t.fleet.map((c) => c.dailyPrice)).toEqual(g.fleet.map((c) => c.dailyPrice));
     expect(t.fleet.map((c) => c.dailyCost)).toEqual(g.fleet.map((c) => c.dailyCost));
-    expect(Object.keys(t).sort()).toEqual([
-      "cash",
-      "customersLeft",
-      "day",
-      "fleet",
-      "lastDay",
-      "minute",
-      "rngState",
-      "seed",
-      "todayRevenue",
-      "upgrades",
-      "xp",
-    ]);
+    expect(Object.keys(t).sort()).toEqual(
+      [
+        "cash",
+        "customersLeft",
+        "day",
+        "fleet",
+        "lastDay",
+        "minute",
+        "rngState",
+        "seed",
+        "todayRevenue",
+        "upgrades",
+        "xp",
+      ]
+        .concat(["managers"])
+        .sort(),
+    );
     for (const c of t.fleet) {
       expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "outcome", "rented"]);
     }

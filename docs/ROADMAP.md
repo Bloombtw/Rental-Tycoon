@@ -66,7 +66,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 3. ✅ **Clients visibles** dans la vue 3D : petits personnages qui arrivent au comptoir, repartent avec une voiture ou repartent déçus (prix trop élevé).
 4. ✅ **Niveau d'agence / XP** (`agency-level.md`) qui débloque de nouveaux modèles : SUV, utilitaire, électrique, cabriolet, luxe. Le catalogue s'ouvre progressivement.
 5. ✅ **Tutoriel guidé** (`tutorial.md`) (première minute : acheter, tarifer, lancer le temps, lire le bilan), remplace le message d'accueil.
-6. ⬜ **Managers / employés** : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
+6. ✅ **Managers / employés** (`managers.md`) : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
 7. ⬜ **Récompense quotidienne** (série de connexions).
 
 ## Plus tard (si le temps le permet)

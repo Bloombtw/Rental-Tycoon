@@ -4,8 +4,11 @@ import {
   buyCar,
   buyUpgrade,
   createGame,
+  fireManager,
+  hireManager,
   levelForXp,
   setCarPrice,
+  type ManagerId,
   type UpgradeId,
   type CarId,
   type CarModelId,
@@ -16,6 +19,7 @@ import { formatCents } from "../format.js";
 import { dayBannerText, isSpeed, type Speed } from "./clock.js";
 import {
   CAR_MODEL_LABELS,
+  MANAGER_LABELS,
   NEW_GAME_NOTICE,
   UPGRADE_LABELS,
   errorMessage,
@@ -48,6 +52,8 @@ export type GameAction =
   | { type: "buyCar"; model: CarModelId }
   | { type: "setCarPrice"; carId: CarId; dailyPrice: Cents }
   | { type: "buyUpgrade"; upgrade: UpgradeId }
+  | { type: "hireManager"; manager: ManagerId }
+  | { type: "fireManager"; manager: ManagerId }
   | { type: "advanceTime"; minutes: number }
   | { type: "setSpeed"; speed: Speed }
   | { type: "togglePause" }
@@ -131,6 +137,16 @@ function applyAction(game: GameState, action: GameAction): { game: GameState; no
         notice: `Prix de la voiture n°${action.carId} fixé à ${formatCents(applied?.dailyPrice ?? 0)}/jour.`,
       };
     }
+    case "hireManager":
+      return {
+        game: hireManager(game, action.manager),
+        notice: `${MANAGER_LABELS[action.manager]} embauché.`,
+      };
+    case "fireManager":
+      return {
+        game: fireManager(game, action.manager),
+        notice: `${MANAGER_LABELS[action.manager]} licencié.`,
+      };
     case "buyUpgrade": {
       const next = buyUpgrade(game, action.upgrade);
       const level = next.upgrades[action.upgrade];
@@ -205,6 +221,8 @@ function reduce(state: UiState, action: GameAction): UiState {
     case "buyCar":
     case "setCarPrice":
     case "buyUpgrade":
+    case "hireManager":
+    case "fireManager":
       try {
         const result = applyAction(state.game, action);
         return { ...state, game: result.game, error: null, notice: result.notice };

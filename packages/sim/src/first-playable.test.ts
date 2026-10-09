@@ -8,6 +8,7 @@ import {
   MAX_CAR_DAILY_COST,
   MAX_CAR_DAILY_PRICE,
   MAX_FLEET_SIZE,
+  NO_MANAGERS,
   NO_UPGRADES,
   UPGRADES,
   SimError,
@@ -98,6 +99,7 @@ function stateOf(
     customersLeft: 0,
     upgrades: FULL_PARKING,
     xp: 0,
+    managers: NO_MANAGERS,
     fleet,
     lastDay: null,
     ...extra,
@@ -116,7 +118,8 @@ const STATE_KEYS = [
   "todayRevenue",
   "upgrades",
   "xp",
-];
+  "managers",
+].sort();
 
 /** Parking at its maximum (50 places) so the tests can buy freely (upgrades.md). */
 const FULL_PARKING = { ...NO_UPGRADES, parking: UPGRADES.parking.maxLevel };
