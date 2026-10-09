@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import type { GameState } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { newGameSummary } from "../game/messages.js";
+import { Button } from "../ui/Button.js";
+import { Icon } from "../ui/icons.js";
 
 interface NewGameDialogProps {
   readonly game: GameState;
@@ -75,23 +77,26 @@ export function NewGameDialog({ game, onCancel, onConfirm }: NewGameDialogProps)
         aria-describedby="new-game-desc"
         data-testid="new-game-dialog"
       >
+        <span className="dialog-badge" aria-hidden="true">
+          <Icon name="restart" size={32} />
+        </span>
         <h2 id="new-game-title">Recommencer une partie ?</h2>
         <p id="new-game-desc" data-testid="new-game-summary">
           {summary}
         </p>
         <div className="dialog-actions">
-          <button
+          <Button
             ref={cancelRef}
-            type="button"
-            className="btn btn-neutral"
+            variant="secondary"
+            size="lg"
             data-testid="new-game-cancel"
             onClick={onCancel}
           >
             Annuler
-          </button>
-          <button
-            type="button"
-            className="btn btn-danger"
+          </Button>
+          <Button
+            variant="danger"
+            size="lg"
             data-testid="new-game-confirm"
             onClick={() => {
               if (confirmed.current) return;
@@ -100,7 +105,7 @@ export function NewGameDialog({ game, onCancel, onConfirm }: NewGameDialogProps)
             }}
           >
             Recommencer
-          </button>
+          </Button>
         </div>
       </div>
     </div>

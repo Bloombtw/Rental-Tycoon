@@ -34,22 +34,22 @@ const fresh = (tier: QualityTier = "high") => ({ m: INITIAL_MONITOR, tier, now: 
 describe("constants and tier table (spec 2.6)", () => {
   it("match the spec", () => {
     expect([FRAME_WINDOW, SLOW_FRAME_MS, SLOW_WINDOWS, TIER_COOLDOWN_MS]).toEqual([
-      60, 24, 2, 5000,
+      60, 20, 2, 5000,
     ]);
     expect(TIER_SETTINGS).toEqual({
       high: {
-        pixelRatioCap: 2,
+        pixelRatioCap: 1.5,
         shadowMapSize: 2048,
-        softShadows: true,
+        softShadows: false,
         trafficMax: 24,
         trafficMin: 8,
         lampPools: true,
         propShadows: true,
       },
       medium: {
-        pixelRatioCap: 1.5,
+        pixelRatioCap: 1.25,
         shadowMapSize: 1024,
-        softShadows: true,
+        softShadows: false,
         trafficMax: 14,
         trafficMin: 5,
         lampPools: true,
@@ -131,12 +131,12 @@ describe("observeFrame", () => {
     expect(s.tier).toBe("medium");
   });
 
-  it("a window averaging exactly 24 ms is not slow, 24.5 ms is", () => {
+  it("a window averaging exactly 20 ms is not slow, 20.5 ms is", () => {
     const a = fresh();
-    feed(a, 600, 24);
+    feed(a, 600, 20);
     expect(a.tier).toBe("high");
     const b = fresh();
-    feed(b, 120, 24.5);
+    feed(b, 120, 20.5);
     expect(b.tier).toBe("medium");
   });
 

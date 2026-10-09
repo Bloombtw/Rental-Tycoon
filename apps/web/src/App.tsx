@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import { type CarId, type CarModelId, type Cents, type GameState } from "@rt/sim";
 import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
@@ -17,7 +17,10 @@ import { gameReducer } from "./game/gameReducer.js";
 import { loadInitialState } from "./game/persistence.js";
 import { newSeed } from "./game/seed.js";
 import { browserSaveStorage, type SaveStorage } from "./game/saveStorage.js";
+import { deviceHints } from "./game/deviceHints.js";
 import { useAutosave } from "./game/useAutosave.js";
+import { useObscuredInsets } from "./game/useObscuredInsets.js";
+import { initialTier, type QualityTier } from "./scene/quality.js";
 import { browserClockDriver, useGameClock, type ClockDriver } from "./game/useGameClock.js";
 
 export function App(props: {
@@ -44,7 +47,35 @@ export function App(props: {
   const [ui, dispatch] = useReducer(gameReducer, loaded.ui);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Quality tier of the scene: it decides how much of the glass is blurred (see app.css).
+  const [quality, setQuality] = useState<QualityTier>(() => initialTier(deviceHints()));
+  const appRef = useRef<HTMLElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+  const hudRef = useRef<HTMLElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const insets = useObscuredInsets({ hud: topRef, drawer: drawerRef });
   const { game } = ui;
+
+  // The side panel (wide screens) starts under the HUD, whatever toasts are showing below it.
+  useEffect(() => {
+    const hud = hudRef.current;
+    const app = appRef.current;
+    if (!hud || !app) return undefined;
+    const apply = (): void => {
+      const bottom = hud.getBoundingClientRect().bottom;
+      if (Number.isFinite(bottom) && bottom > 0) {
+        app.style.setProperty("--hud-bottom", `${String(Math.round(bottom))}px`);
+      }
+    };
+    apply();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(apply) : null;
+    observer?.observe(hud);
+    window.addEventListener("resize", apply);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", apply);
+    };
+  }, []);
 
   const autosave = useAutosave({
     storage,
@@ -120,30 +151,52 @@ export function App(props: {
   }, []);
 
   return (
-    <main className="app" data-drawer={drawerOpen ? "open" : "peek"}>
-      <Hud
-        game={game}
-        speed={ui.speed}
-        paused={ui.paused}
-        hasRun={ui.hasRun}
-        onSetSpeed={onSetSpeed}
-        onTogglePause={onTogglePause}
-      />
-      <SaveWarning
-        status={autosave.status}
-        visible={autosave.warningVisible}
-        onDismiss={autosave.dismissWarning}
-      />
-      <MessageBanner error={ui.error} notice={ui.notice} onDismiss={onDismissMessage} />
+    <main
+      ref={appRef}
+      className="app"
+      data-drawer={drawerOpen ? "open" : "peek"}
+      data-quality={quality}
+      style={{ "--inset-top": `${String(insets.top)}px` } as CSSProperties}
+    >
+      {/* The scene fills the screen; everything else floats above it. */}
+      <div className="top-layer" ref={topRef}>
+        <Hud
+          ref={hudRef}
+          game={game}
+          speed={ui.speed}
+          paused={ui.paused}
+          hasRun={ui.hasRun}
+          onSetSpeed={onSetSpeed}
+          onTogglePause={onTogglePause}
+        />
+        <SaveWarning
+          status={autosave.status}
+          visible={autosave.warningVisible}
+          onDismiss={autosave.dismissWarning}
+        />
+        <MessageBanner error={ui.error} notice={ui.notice} onDismiss={onDismissMessage} />
+      </div>
       <div className="stage">
         <ErrorBoundary fallback={<AgencyFallback />}>
-          <AgencyView game={game} paused={ui.paused} speed={ui.speed} pendingRef={pendingRef} />
+          <AgencyView
+            game={game}
+            paused={ui.paused}
+            speed={ui.speed}
+            pendingRef={pendingRef}
+            insets={insets}
+            onQualityChange={setQuality}
+          />
         </ErrorBoundary>
         {ui.dayBanner !== null && (
           <DayBanner text={ui.dayBanner} speed={ui.speed} onDismiss={onDismissBanner} />
         )}
       </div>
-      <ManageDrawer open={drawerOpen} fleetSize={game.fleet.length} onSetOpen={setDrawerOpen}>
+      <ManageDrawer
+        ref={drawerRef}
+        open={drawerOpen}
+        fleetSize={game.fleet.length}
+        onSetOpen={setDrawerOpen}
+      >
         <FleetPanel fleet={game.fleet} onSetPrice={onSetPrice} />
         <BuyCarPanel
           cash={game.cash}

@@ -1,3 +1,6 @@
+import { Button } from "../ui/Button.js";
+import { PanelHeader } from "../ui/PanelHeader.js";
+
 interface NewGameButtonProps {
   readonly onClick: () => void;
 }
@@ -6,15 +9,17 @@ interface NewGameButtonProps {
 export function NewGameButton({ onClick }: NewGameButtonProps) {
   return (
     <section className="card panel" aria-labelledby="game-title">
-      <h2 id="game-title">Partie</h2>
-      <button
-        type="button"
-        className="btn btn-danger-quiet new-game-btn"
+      <PanelHeader icon="settings" tone="neutral" id="game-title" title="Partie" />
+      <Button
+        variant="danger-quiet"
+        size="lg"
+        icon="restart"
+        className="new-game-btn"
         data-testid="new-game"
         onClick={onClick}
       >
         Nouvelle partie
-      </button>
+      </Button>
     </section>
   );
 }

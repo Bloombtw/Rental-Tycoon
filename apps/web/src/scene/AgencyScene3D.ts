@@ -23,7 +23,14 @@ import {
   type BufferGeometry,
 } from "three";
 import { MAX_FLEET_SIZE, type GameState } from "@rt/sim";
-import { CAR_ASSET, TRAFFIC_ASSET, carAssetKey, requiredAssets, type AssetRef } from "./assets.js";
+import {
+  CAR_ASSET,
+  TRAFFIC_ASSET,
+  carAssetKey,
+  requiredAssets,
+  type AssetRef,
+  type CarAssetKey,
+} from "./assets.js";
 import type { Camera, ScreenRect } from "./camera.js";
 import { WHEEL_RADIUS, carPoseAt, type CarPose } from "./carMotion.js";
 import { computeCityPlan, type CityPlan } from "./cityPlan.js";
@@ -31,6 +38,7 @@ import { CarInstancer, RentedDots } from "./gl/carInstances.js";
 import { buildCityMesh, type CityMesh } from "./gl/cityMesh.js";
 import { assetKey, disposeTemplates, loadTemplates, type Template } from "./gl/loader.js";
 import { NightLights } from "./gl/nightLights.js";
+import { renderCarThumbnails } from "./gl/thumbnails.js";
 import { cameraRig, groundPointOnScreen, shadowFrustum } from "./iso.js";
 import type { AgencyLayout } from "./layout.js";
 import { lightAt, type LightState } from "./lighting.js";
@@ -117,6 +125,10 @@ export class AgencyScene3D {
   private trafficShown = 0;
   private readonly poses: CarPose[] = [];
   private readonly scratchPoint = { x: 0, y: 0, z: 0 };
+  /** Shadow-pass throttling: see `render`. */
+  private lastAmbient = Number.NaN;
+  private animating = false;
+  private frameNo = 0;
   private light: LightState;
   private lightTime = Number.NaN;
   private tier: QualityTier;
@@ -201,7 +213,8 @@ export class AgencyScene3D {
   /** Creates the renderer inside `host` and loads the models. Rejects on any failure. */
   static async create(host: HTMLElement, o: SceneOptions): Promise<AgencyScene3D> {
     if (o.isCancelled()) throw new Error("cancelled");
-    const renderer = new WebGLRenderer({ antialias: true });
+    // Laptops with two GPUs otherwise often run the scene on the integrated one.
+    const renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     let templates: Map<string, Template> | null = null;
     try {
       // A GPU with small textures is capped to the lowest tier whatever the caller said.
@@ -210,6 +223,7 @@ export class AgencyScene3D {
         initialTier({ maxTextureSize: renderer.capabilities.maxTextureSize }),
       );
       renderer.shadowMap.enabled = true;
+      renderer.shadowMap.autoUpdate = false; // refreshed on demand in `render`
       applyRendererTier(renderer, tier);
       renderer.setSize(Math.max(1, o.size.width), Math.max(1, o.size.height));
       templates = await loadTemplates(
@@ -300,6 +314,25 @@ export class AgencyScene3D {
   /** Draw calls and triangles of the last render, and the background cars on screen. */
   stats(): { readonly calls: number; readonly triangles: number; readonly traffic: number } {
     return { ...this.drawStats, traffic: this.trafficShown };
+  }
+
+  /**
+   * Renders one transparent PNG data URL per car asset key on this scene's renderer (same models,
+   * no second WebGL context). Rejects if the scene is gone or the render fails; the renderer state
+   * is restored either way. Call between frames, never during a gesture.
+   */
+  renderThumbnails(
+    keys: readonly CarAssetKey[],
+    size: { width: number; height: number },
+  ): Promise<ReadonlyMap<CarAssetKey, string>> {
+    if (this.destroyed || this.failed) return Promise.reject(new Error("scene unavailable"));
+    try {
+      return Promise.resolve(
+        renderCarThumbnails({ renderer: this.renderer, templates: this.templates, keys, size }),
+      );
+    } catch (error) {
+      return Promise.reject(error instanceof Error ? error : new Error("thumbnail render failed"));
+    }
   }
 
   /** The tier actually in use (creation may lower the requested one). */
@@ -395,6 +428,8 @@ export class AgencyScene3D {
 
   update(game: GameState, timeOfDay: number, layout: AgencyLayout, ambientSeconds: number): void {
     if (this.destroyed) return;
+    this.animating = ambientSeconds !== this.lastAmbient;
+    this.lastAmbient = ambientSeconds;
     const plan = this.planFor(layout);
     const routes = this.routesFor(layout, plan);
     this.syncDecor(layout, plan);
@@ -522,6 +557,11 @@ export class AgencyScene3D {
     if (this.destroyed || this.failed) return;
     if (typeof document !== "undefined" && document.hidden) return;
     try {
+      // The shadow pass redraws every caster (the whole city). While time runs, refresh it every
+      // other frame: cars move a few centimetres per frame, so a 30 Hz shadow is invisible. A
+      // still frame (paused, or a one-off redraw) always gets fresh shadows.
+      this.frameNo = (this.frameNo + 1) % 2;
+      this.renderer.shadowMap.needsUpdate = !this.animating || this.frameNo === 0;
       this.renderer.render(this.scene, this.camera);
       const info = this.renderer.info.render;
       this.drawStats = { calls: info.calls, triangles: info.triangles };

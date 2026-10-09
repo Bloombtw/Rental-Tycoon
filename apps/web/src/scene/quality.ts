@@ -16,19 +16,21 @@ export interface TierSettings {
 }
 
 export const TIER_SETTINGS: Readonly<Record<QualityTier, TierSettings>> = Object.freeze({
+  // Fill rate dominates on phones and laptops: past 1.5x the gain is invisible on a low-poly
+  // scene, and PCF soft shadows cost several texture taps per pixel for a barely visible blur.
   high: Object.freeze({
-    pixelRatioCap: 2,
+    pixelRatioCap: 1.5,
     shadowMapSize: 2048,
-    softShadows: true,
+    softShadows: false,
     trafficMax: 24,
     trafficMin: 8,
     lampPools: true,
     propShadows: true,
   }),
   medium: Object.freeze({
-    pixelRatioCap: 1.5,
+    pixelRatioCap: 1.25,
     shadowMapSize: 1024,
-    softShadows: true,
+    softShadows: false,
     trafficMax: 14,
     trafficMin: 5,
     lampPools: true,
@@ -81,7 +83,7 @@ export const INITIAL_MONITOR: FrameMonitor = Object.freeze({
 });
 
 export const FRAME_WINDOW = 60,
-  SLOW_FRAME_MS = 24,
+  SLOW_FRAME_MS = 20,
   SLOW_WINDOWS = 2,
   TIER_COOLDOWN_MS = 5000;
 

@@ -1,5 +1,6 @@
-/* Design tokens — flat top-down style. Use these, never raw hex values in components. */
+/* Design tokens: flat top-down style with soft glass. Use these, never raw hex values in components. */
 :root {
+  /* Base palette (the 3D scene reads --c-grass, --c-road, --c-on-dark, --c-money-on-dark, --c-accent) */
   --c-asphalt: #2b2d42;
   --c-road: #3d405b;
   --c-grass: #81b29a;
@@ -15,19 +16,123 @@
   --c-money-strong: #26692f; /* 6.68:1 with --c-on-dark text */
   --c-danger-text: #b31d2c; /* 5.9:1 on --c-sand, higher on --c-surface */
   --c-surface: #ffffff;
+  --c-surface-2: #f7f5ec;
   --c-on-dark: #ffffff;
   --c-ink-muted: #5c5f73;
+
+  /* Colour ramps */
+  --c-primary-300: #f6a488;
+  --c-primary-500: var(--c-accent);
+  --c-primary-700: #b4553c;
+  --c-money-300: #7be08a;
+  --c-money-500: #3fa34d;
+  --c-money-700: var(--c-money-strong);
+  --c-danger-300: #ff6b78;
+  --c-danger-500: #d62839;
+  --c-danger-700: #9e1a28;
+  --c-gold-300: #ffd76a;
+  --c-gold-500: #f2b02c;
+  --c-gold-700: #b97a0c;
+  --c-neutral-100: #f7f5ec;
+  --c-neutral-300: #d9d6c8;
+  --c-neutral-500: #8a8ca0;
+  --c-night: #1d2a4d;
+
+  /* Surfaces and glass */
+  --c-scrim: rgb(15 16 28 / 0.55);
+  --c-focus: #ffd76a;
+  --c-on-glass: #ffffff;
+  --c-on-glass-muted: rgb(255 255 255 / 0.72);
+  --c-glass-border: rgb(255 255 255 / 0.18);
+  --c-glass-well: rgb(0 0 0 / 0.28);
+  --c-glass-chip: rgb(255 255 255 / 0.12);
+  --c-glass-chip-strong: rgb(255 255 255 / 0.22);
+  --c-hairline: rgb(27 27 30 / 0.08);
+  --c-model-used: #8d99a6;
+  --c-model-compact: #4f9fe0;
+  --c-model-hybrid: #3dbb8c;
+
+  /* Translucent tints, no blur (backdrop-filter over the 3D canvas is too costly). */
+  --glass-dark: rgb(27 29 46 / 0.8);
+  --glass-dark-opaque: rgb(27 29 46 / 0.94);
+  --glass-light: rgb(250 248 240 / 0.9);
+  --glass-light-opaque: rgb(250 248 240 / 0.97);
+
+  /* Gradients */
+  --g-primary: linear-gradient(180deg, var(--c-primary-300), var(--c-primary-500));
+  --g-money: linear-gradient(180deg, var(--c-money-300), var(--c-money-500));
+  --g-money-dark: linear-gradient(180deg, var(--c-money-700), var(--c-asphalt));
+  --g-danger: linear-gradient(180deg, var(--c-danger-300), var(--c-danger-500));
+  --g-gold: linear-gradient(180deg, var(--c-gold-300), var(--c-gold-500));
+  --g-neutral: linear-gradient(180deg, var(--c-surface), var(--c-neutral-100));
+  --g-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0) 50%);
+  --g-day: linear-gradient(90deg, var(--c-gold-300), var(--c-primary-500), var(--c-night));
+  --g-podium: radial-gradient(ellipse at 50% 60%, var(--c-neutral-100), transparent 70%);
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
   --radius: 14px;
-  --radius-sm: 8px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  /* Elevations and button relief */
   --shadow: 0 6px 0 rgb(0 0 0 / 0.15);
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.12), 0 2px 8px rgb(0 0 0 / 0.08);
+  --elev-2: 0 4px 12px rgb(0 0 0 / 0.16);
+  --elev-3: 0 12px 32px rgb(0 0 0 / 0.24);
+  --lip-primary: 0 4px 0 var(--c-primary-700);
+  --lip-money: 0 4px 0 var(--c-money-700);
+  --lip-danger: 0 4px 0 var(--c-danger-700);
+  --lip-neutral: 0 4px 0 var(--c-neutral-300);
+  --inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.45);
+  --inset-well: inset 0 2px 4px rgb(0 0 0 / 0.35);
+
+  /* Motion */
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 360ms;
+  --dur-counter: 450ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition: var(--dur-fast) var(--ease-out);
+
+  /* Typography (system stacks only: offline, zero bytes) */
+  --font-display:
+    ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fw-bold: 700;
+  --fw-heavy: 800;
+  --fw-black: 900;
+  --fs-xs: 12px;
+  --fs-sm: 14px;
+  --fs-md: 16px;
+  --fs-lg: 20px;
+  --fs-xl: 24px;
+  --fs-num: 22px;
+  --ts-on-dark: 0 1px 0 rgb(0 0 0 / 0.35);
+
+  /* Spacing, sizes and layers */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 24px;
-  --transition: 160ms ease-out;
-  --font: "Inter", system-ui, sans-serif;
-  font-family: var(--font);
+  --tap: 44px;
+  --tap-lg: 52px;
+  --hud-margin: 8px;
+  --z-fab: 2;
+  --z-tooltip: 3;
+  --z-hud: 5;
+  --z-toast: 6;
+  --z-sheet: 7;
+  --z-dialog: 20;
+
+  font-family: var(--font-body);
   color: var(--c-ink);
   background: var(--c-sand);
 }

@@ -19,6 +19,19 @@ export interface ScreenRect {
   readonly height: number;
 }
 
+/** Parts of the view hidden under floating UI (HUD, sheet, side panel), in screen pixels. */
+export interface ObscuredInsets {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+}
+
+export const NO_INSETS: ObscuredInsets = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });
+
+/** At most this share of an axis can be hidden: at least 30 % of the scene stays free. */
+export const MAX_OBSCURED_SHARE = 0.7;
+
 export const MAX_FIT_ZOOM = 27;
 export const MIN_MAX_ZOOM = 40;
 
@@ -38,14 +51,58 @@ function boundsValid(b: Rect): boolean {
   return ok(b.x) && ok(b.y) && ok(b.width) && ok(b.height);
 }
 
+function clampAxisPair(a: number, b: number, size: number): [number, number] {
+  const cap = Math.max(0, size) * MAX_OBSCURED_SHARE;
+  let lo = ok(a) ? Math.min(Math.max(0, a), cap) : 0;
+  let hi = ok(b) ? Math.min(Math.max(0, b), cap) : 0;
+  const sum = lo + hi;
+  if (sum > cap && sum > 0) {
+    lo = (lo / sum) * cap;
+    hi = (hi / sum) * cap;
+  }
+  return [lo, hi];
+}
+
+/**
+ * Makes insets safe for a view of `size`: finite, never negative, and together at most 70 % of
+ * each axis. Anything invalid counts as 0.
+ */
+export function clampInsets(
+  insets: ObscuredInsets,
+  size: { readonly width: number; readonly height: number },
+): ObscuredInsets {
+  const w = ok(size.width) ? size.width : 0;
+  const h = ok(size.height) ? size.height : 0;
+  const [top, bottom] = clampAxisPair(insets.top, insets.bottom, h);
+  const [left, right] = clampAxisPair(insets.left, insets.right, w);
+  return { top, right, bottom, left };
+}
+
+/** The part of `view` left free by the insets. */
+function freeRect(view: ScreenRect, insets: ObscuredInsets): ScreenRect {
+  if (!viewValid(view)) return view;
+  const i = clampInsets(insets, view);
+  if (i.top + i.right + i.bottom + i.left === 0) return view;
+  return {
+    x: view.x + i.left,
+    y: view.y + i.top,
+    width: Math.max(1, view.width - i.left - i.right),
+    height: Math.max(1, view.height - i.top - i.bottom),
+  };
+}
+
 function fitZoom(bounds: Rect, view: ScreenRect): number {
   if (!viewValid(view) || !boundsValid(bounds)) return 1;
   const z = Math.min(view.width / bounds.width, view.height / bounds.height, MAX_FIT_ZOOM);
   return ok(z) && z > 0 ? z : 1;
 }
 
-export function zoomBounds(bounds: Rect, view: ScreenRect): { min: number; max: number } {
-  const min = fitZoom(bounds, view);
+export function zoomBounds(
+  bounds: Rect,
+  view: ScreenRect,
+  insets: ObscuredInsets = NO_INSETS,
+): { min: number; max: number } {
+  const min = fitZoom(bounds, freeRect(view, insets));
   return { min, max: Math.max(MIN_MAX_ZOOM, min) };
 }
 
@@ -58,14 +115,41 @@ export function fitCamera(bounds: Rect, view: ScreenRect): Camera {
   };
 }
 
+/**
+ * Fits `bounds` inside the free rectangle of `view` (what the insets leave visible). The camera
+ * is expressed for the whole view (setCamera, panning and taps stay in full-view coordinates),
+ * so the bounds' centre lands on the centre of the free rectangle. Zero insets = fitCamera.
+ */
+export function fitCameraInRect(bounds: Rect, view: ScreenRect, insets: ObscuredInsets): Camera {
+  if (!viewValid(view) || !boundsValid(bounds)) return fitCamera(bounds, view);
+  const free = freeRect(view, insets);
+  const zoom = fitZoom(bounds, free);
+  // Screen offset of the free rectangle's centre from the view's centre.
+  const dx = free.x + free.width / 2 - (view.x + view.width / 2);
+  const dy = free.y + free.height / 2 - (view.y + view.height / 2);
+  return {
+    zoom,
+    centerX: bounds.x + bounds.width / 2 - dx / zoom,
+    centerY: bounds.y + bounds.height / 2 - dy / zoom,
+  };
+}
+
 function clampAxis(center: number, visible: number, origin: number, size: number): number {
   if (visible >= size) return origin + size / 2;
   const half = visible / 2;
   return Math.min(origin + size - half, Math.max(origin + half, center));
 }
 
-/** Keeps the zoom in bounds and the view inside `bounds`. Non-finite input -> overview. */
-export function clampCamera(cam: Camera, bounds: Rect, view: ScreenRect): Camera {
+/**
+ * Keeps the zoom in bounds and the view inside `bounds`. Non-finite input -> overview.
+ * With insets, the free rectangle (not the whole view) is what must stay inside `bounds`.
+ */
+export function clampCamera(
+  cam: Camera,
+  bounds: Rect,
+  view: ScreenRect,
+  insets: ObscuredInsets = NO_INSETS,
+): Camera {
   if (
     !ok(cam.zoom) ||
     !ok(cam.centerX) ||
@@ -74,15 +158,16 @@ export function clampCamera(cam: Camera, bounds: Rect, view: ScreenRect): Camera
     !viewValid(view) ||
     !boundsValid(bounds)
   ) {
-    return fitCamera(bounds, view);
+    return fitCameraInRect(bounds, view, insets);
   }
-  const { min, max } = zoomBounds(bounds, view);
+  const { min, max } = zoomBounds(bounds, view, insets);
   const zoom = Math.min(max, Math.max(min, cam.zoom));
-  return {
-    zoom,
-    centerX: clampAxis(cam.centerX, view.width / zoom, bounds.x, bounds.width),
-    centerY: clampAxis(cam.centerY, view.height / zoom, bounds.y, bounds.height),
-  };
+  const free = freeRect(view, insets);
+  const dx = free.x + free.width / 2 - (view.x + view.width / 2);
+  const dy = free.y + free.height / 2 - (view.y + view.height / 2);
+  const fx = clampAxis(cam.centerX + dx / zoom, free.width / zoom, bounds.x, bounds.width);
+  const fy = clampAxis(cam.centerY + dy / zoom, free.height / zoom, bounds.y, bounds.height);
+  return { zoom, centerX: fx - dx / zoom, centerY: fy - dy / zoom };
 }
 
 /** View-plane point -> screen pixel. */

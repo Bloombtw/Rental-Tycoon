@@ -54,3 +54,14 @@ Les questions qui demandent une décision humaine. Le travail ne bloque pas dess
 
 4. **Vérification sur un vrai iPhone** (critère 16) : PWA installée, appli tuée depuis le sélecteur, puis rouverte. Les agents n'ont pas d'iPhone.
    _Recommandation_ : fusionner après les tests jsdom et l'émulation, puis faire vérifier par un humain.
+
+## ui-overhaul (révision 1, refonte de l'interface)
+
+1. **Police auto-hébergée ?** La spec utilise la pile système (`ui-rounded` = SF Pro Rounded sur iPhone). Sur Android et Windows, les titres retombent sur une police non arrondie (Roboto, Segoe UI), donc le jeu y paraît moins « tycoon ». Les agents ne peuvent pas télécharger de fichier de police.
+   _Recommandation_ : garder la pile système (zéro octet, hors ligne garanti, parfait sur la cible iPhone). Si le rendu Android/desktop compte, qu'un humain ajoute une police OFL en `woff2` (par ex. « Nunito » ou « Fredoka », sous-ensemble latin, < 60 Ko) dans `apps/web/public/fonts/` avec sa licence ; elle sera ajoutée en tête de `--font-display` et mise en cache par le service worker.
+
+2. **Coût réel du verre dépoli sur iPhone.** Le flou par palier (14 / 8 / 0 px) est vérifié en émulation seulement.
+   _Recommandation_ : fusionner sur l'émulation, puis faire vérifier par un humain sur iPhone (PWA installée, à 20:30, temps en x10, feuille ouverte) ; si ça saccade, passer `medium` à 0 px (une ligne dans `tokens.css`).
+
+3. **Scène plein écran sous l'UI flottante** (décision 1 de la spec). Change la mise en page de `first-playable` (HUD et feuille ne réduisent plus la scène, ils la recouvrent ; le cadrage tient compte des zones masquées).
+   _Recommandation_ : l'adopter (standard des tycoons mobiles). À revoir après les captures avant/après si la feuille ouverte cache trop la ville sur un petit iPhone (SE, 375 × 667).
