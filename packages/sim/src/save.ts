@@ -17,9 +17,19 @@ import {
   type RentalOutcome,
 } from "./state.js";
 import { DAY_MINUTES } from "./time.js";
+import {
+  ADS_BONUS_PCT,
+  fleetCapacity,
+  NO_UPGRADES,
+  parkingLevelFor,
+  UPGRADE_IDS,
+  UPGRADES,
+  type UpgradeId,
+  type Upgrades,
+} from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 2;
+export const GAME_STATE_VERSION = 3;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -116,7 +126,18 @@ function parseCar(raw: unknown, index: number, seen: Set<number>): Car {
 }
 
 /** Most customers a day can draw (full fleet, top of the demand range). */
-const MAX_CUSTOMERS = DEMAND_BASE + Math.round((MAX_FLEET_SIZE * DEMAND_MAX_PCT) / 100);
+const MAX_CUSTOMERS =
+  DEMAND_BASE +
+  Math.round((MAX_FLEET_SIZE * (DEMAND_MAX_PCT + ADS_BONUS_PCT * UPGRADES.ads.maxLevel)) / 100);
+
+function parseUpgrades(raw: unknown): Upgrades {
+  if (!isRecord(raw)) throw new InvalidGameStateError("upgrades", "type");
+  const out: Record<UpgradeId, number> = { ...NO_UPGRADES };
+  for (const id of UPGRADE_IDS) {
+    out[id] = int(own(raw, id), `upgrades.${id}`, 0, UPGRADES[id].maxLevel);
+  }
+  return out;
+}
 
 function parse(raw: unknown): GameState {
   if (!isRecord(raw)) throw new InvalidGameStateError("$", "type");
@@ -155,7 +176,31 @@ function parse(raw: unknown): GameState {
   if ((lastDay === null) !== (day === 0))
     throw new InvalidGameStateError("lastDay", "inconsistent");
 
-  return { seed, rngState, day, minute, cash, todayRevenue, customersLeft, fleet, lastDay };
+  const upgrades = parseUpgrades(own(raw, "upgrades"));
+  if (fleet.length > fleetCapacity(upgrades)) {
+    throw new InvalidGameStateError("upgrades.parking", "inconsistent");
+  }
+
+  return {
+    seed,
+    rngState,
+    day,
+    minute,
+    cash,
+    todayRevenue,
+    customersLeft,
+    upgrades,
+    fleet,
+    lastDay,
+  };
+}
+
+/** v2 → v3: adds `upgrades`, with a parking that holds the fleet. */
+function migrateV2(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const fleet = own(raw, "fleet");
+  const size = Array.isArray(fleet) ? fleet.length : 0;
+  return { ...raw, upgrades: { ...NO_UPGRADES, parking: parkingLevelFor(size) } };
 }
 
 /** v1 → v2: adds `customersLeft` (generous: one per car for the rest of the day). */
@@ -192,12 +237,11 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
     throw new UnsupportedGameStateVersionError(stateVersion, newer);
   }
   let data = raw;
-  if (stateVersion < 2) {
-    try {
-      data = migrateV1(data);
-    } catch {
-      throw new InvalidGameStateError("$", "type");
-    }
+  try {
+    if (stateVersion < 2) data = migrateV1(data);
+    if (stateVersion < 3) data = migrateV2(data);
+  } catch {
+    throw new InvalidGameStateError("$", "type");
   }
   return validateGameState(data);
 }

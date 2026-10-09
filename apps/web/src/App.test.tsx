@@ -2,9 +2,11 @@ import { act, StrictMode, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  BASE_PARKING_SPOTS,
   CAR_MODELS,
   MAX_CAR_DAILY_PRICE,
   MAX_FLEET_SIZE,
+  UPGRADES,
   createGame,
   type GameState,
   type NewCar,
@@ -98,6 +100,11 @@ function mount(node: ReactNode): void {
   act(() => {
     root.render(node);
   });
+}
+
+/** Full parking (50 places) so purchases are limited by cash or MAX_FLEET_SIZE only. */
+function roomy(g: GameState): GameState {
+  return { ...g, upgrades: { ...g.upgrades, parking: UPGRADES.parking.maxLevel } };
 }
 
 function mountApp(initialGame?: GameState): void {
@@ -204,7 +211,7 @@ describe("App: launch", () => {
     expect(reportText()).toBe("Aucune journée écoulée.");
     expect(norm(text("hud-today"))).toContain("Aujourd'hui : +0,00 €");
     expect(maybeId("fleet-empty")).not.toBeNull();
-    expect(container.textContent).toContain(`Flotte 0/${MAX_FLEET_SIZE}`);
+    expect(container.textContent).toContain(`Flotte 0/${BASE_PARKING_SPOTS}`);
     expect(maybeId("error-banner")).toBeNull();
     expect(maybeId("notice")).toBeNull();
     assertClean();
@@ -496,7 +503,7 @@ describe("App: buying limits", () => {
   });
 
   it("spam-clicking buy-used until broke: stops at the limit, button disabled, no error banner", () => {
-    mountApp();
+    mountApp(roomy(createGame(1)));
     const expected = Math.floor(50_000_00 / CAR_MODELS.used.purchasePrice);
     for (let i = 0; i < 40; i++) clickId("buy-used");
     expect(container.querySelectorAll('[data-testid^="car-row-"]')).toHaveLength(expected);
@@ -506,7 +513,7 @@ describe("App: buying limits", () => {
   });
 
   it("reaching 50 cars one purchase at a time, then the 51st is impossible via UI", () => {
-    mountApp(createGame(1, 10 ** 12));
+    mountApp(roomy(createGame(1, 10 ** 12)));
     for (let i = 0; i < MAX_FLEET_SIZE + 5; i++) clickId("buy-used");
     expect(container.querySelectorAll('[data-testid^="car-row-"]')).toHaveLength(MAX_FLEET_SIZE);
     expect(container.textContent).toContain(`Flotte ${MAX_FLEET_SIZE}/${MAX_FLEET_SIZE}`);
@@ -736,7 +743,7 @@ describe("App: drawer and view", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(content?.hidden).toBe(true);
     expect(byId("drawer").getAttribute("data-state")).toBe("peek");
-    expect(toggle.textContent).toContain(`Flotte 0/${MAX_FLEET_SIZE}`);
+    expect(toggle.textContent).toContain(`Flotte 0/${BASE_PARKING_SPOTS}`);
     click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
   });
@@ -745,7 +752,7 @@ describe("App: drawer and view", () => {
     mountApp();
     clickId("buy-used");
     click(byId("drawer-toggle"));
-    expect(byId("drawer-toggle").textContent).toContain(`Flotte 1/${MAX_FLEET_SIZE}`);
+    expect(byId("drawer-toggle").textContent).toContain(`Flotte 1/${BASE_PARKING_SPOTS}`);
   });
 
   function pointer(el: HTMLElement, type: string, clientY: number): void {

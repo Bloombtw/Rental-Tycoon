@@ -15,6 +15,7 @@ import {
   setCarPrice,
   SimOverflowError,
   tick,
+  UPGRADES,
   type Car,
   type GameState,
   type NewCar,
@@ -513,7 +514,9 @@ describe("composition: a then b equals a + b", () => {
 
 describe("buying and pricing during the day", () => {
   function withTwentyCars(minute: number): GameState {
-    return at(createGame(1, CASH, fleetOf(20)), minute);
+    const g = createGame(1, CASH, fleetOf(20));
+    // Room to buy more: full parking (upgrades.md).
+    return at({ ...g, upgrades: { ...g.upgrades, parking: UPGRADES.parking.maxLevel } }, minute);
   }
 
   it("a car bought at minute 30 as the 21st (slot 40) leaves the same day", () => {

@@ -6,3 +6,4 @@ export * from "./save.js";
 export * from "./state.js";
 export * from "./tick.js";
 export * from "./time.js";
+export * from "./upgrades.js";

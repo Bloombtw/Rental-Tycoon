@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CAR_MODELS,
   MAX_FLEET_SIZE,
+  UPGRADES,
   buyCar,
   createGame,
   tick,
@@ -20,6 +21,12 @@ import {
 } from "./gameReducer.js";
 import { PRICE_RANGE_ERROR, errorMessage } from "./messages.js";
 import { FleetFullError, InsufficientCashError } from "@rt/sim";
+
+/** Full parking (50 places): purchases limited by cash or MAX_FLEET_SIZE only. */
+const roomy = (g: GameState): GameState => ({
+  ...g,
+  upgrades: { ...g.upgrades, parking: UPGRADES.parking.maxLevel },
+});
 
 const IDLE: readonly NewCar[] = [
   { dailyPrice: 200_00, dailyCost: 30_00 },
@@ -273,7 +280,7 @@ describe("gameReducer", () => {
   });
 
   it("spam buying: ends with an error, cash never negative, ids unique", () => {
-    let s: UiState = initUiState();
+    let s: UiState = initUiState(roomy(createGame(1)));
     for (let i = 0; i < 100; i++) s = gameReducer(s, { type: "buyCar", model: "used" });
     expect(s.game.cash).toBeGreaterThanOrEqual(0);
     expect(s.game.fleet.length).toBe(Math.floor(50_000_00 / CAR_MODELS.used.purchasePrice));
@@ -284,7 +291,7 @@ describe("gameReducer", () => {
   });
 
   it("buying the 51st car: FLEET_FULL message, fleet stays at 50", () => {
-    let s: UiState = initUiState(createGame(1, 10 ** 12));
+    let s: UiState = initUiState(roomy(createGame(1, 10 ** 12)));
     for (let i = 0; i < MAX_FLEET_SIZE; i++) s = gameReducer(s, { type: "buyCar", model: "used" });
     expect(s.game.fleet).toHaveLength(MAX_FLEET_SIZE);
     const before = s.game;
@@ -491,5 +498,19 @@ describe("setSpeed / togglePause / pause / hasRun / dismissDayBanner", () => {
   it("a forged nextDay action is ignored", () => {
     const start = running();
     expect(gameReducer(start, forge({ type: "nextDay" }))).toBe(start);
+  });
+});
+
+describe("buyUpgrade (upgrades.md)", () => {
+  it("pays, raises the level and says so; refusals keep the state", () => {
+    const s = initUiState(createGame(1));
+    const u = gameReducer(s, { type: "buyUpgrade", upgrade: "parking" });
+    expect(u.game.upgrades.parking).toBe(1);
+    expect(u.game.cash).toBe(s.game.cash - UPGRADES.parking.baseCost);
+    expect(u.notice).toBe("Agrandir le parking : niveau 1 atteint.");
+    const broke = initUiState(createGame(1, 0));
+    const r = gameReducer(broke, { type: "buyUpgrade", upgrade: "wash" });
+    expect(r.game).toBe(broke.game);
+    expect(r.error).toContain("Fonds insuffisants");
   });
 });

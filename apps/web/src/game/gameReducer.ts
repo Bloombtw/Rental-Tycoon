@@ -2,8 +2,10 @@ import {
   CAR_MODELS,
   advanceMinutes,
   buyCar,
+  buyUpgrade,
   createGame,
   setCarPrice,
+  type UpgradeId,
   type CarId,
   type CarModelId,
   type Cents,
@@ -11,7 +13,7 @@ import {
 } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { dayBannerText, isSpeed, type Speed } from "./clock.js";
-import { CAR_MODEL_LABELS, NEW_GAME_NOTICE, errorMessage } from "./messages.js";
+import { CAR_MODEL_LABELS, NEW_GAME_NOTICE, UPGRADE_LABELS, errorMessage } from "./messages.js";
 import { offlineDays, playOffline, type OfflineReport } from "./offline.js";
 
 export const DEFAULT_SEED = 1;
@@ -35,6 +37,7 @@ export interface UiState {
 export type GameAction =
   | { type: "buyCar"; model: CarModelId }
   | { type: "setCarPrice"; carId: CarId; dailyPrice: Cents }
+  | { type: "buyUpgrade"; upgrade: UpgradeId }
   | { type: "advanceTime"; minutes: number }
   | { type: "setSpeed"; speed: Speed }
   | { type: "togglePause" }
@@ -102,6 +105,14 @@ function applyAction(game: GameState, action: GameAction): { game: GameState; no
         notice: `Prix de la voiture n°${action.carId} fixé à ${formatCents(applied?.dailyPrice ?? 0)}/jour.`,
       };
     }
+    case "buyUpgrade": {
+      const next = buyUpgrade(game, action.upgrade);
+      const level = next.upgrades[action.upgrade];
+      return {
+        game: next,
+        notice: `${UPGRADE_LABELS[action.upgrade]} : niveau ${String(level)} atteint.`,
+      };
+    }
     default:
       throw new Error("unknown action");
   }
@@ -161,6 +172,7 @@ function reduce(state: UiState, action: GameAction): UiState {
       return state.paused ? state : { ...state, paused: true };
     case "buyCar":
     case "setCarPrice":
+    case "buyUpgrade":
       try {
         const result = applyAction(state.game, action);
         return { ...state, game: result.game, error: null, notice: result.notice };

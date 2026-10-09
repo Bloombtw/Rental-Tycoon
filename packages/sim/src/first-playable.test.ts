@@ -8,6 +8,8 @@ import {
   MAX_CAR_DAILY_COST,
   MAX_CAR_DAILY_PRICE,
   MAX_FLEET_SIZE,
+  NO_UPGRADES,
+  UPGRADES,
   SimError,
   SimOverflowError,
   UnknownCarError,
@@ -94,6 +96,7 @@ function stateOf(
     cash,
     todayRevenue: 0,
     customersLeft: 0,
+    upgrades: FULL_PARKING,
     fleet,
     lastDay: null,
     ...extra,
@@ -110,7 +113,12 @@ const STATE_KEYS = [
   "rngState",
   "seed",
   "todayRevenue",
+  "upgrades",
 ];
+
+/** Parking at its maximum (50 places) so the tests can buy freely (upgrades.md). */
+const FULL_PARKING = { ...NO_UPGRADES, parking: UPGRADES.parking.maxLevel };
+const roomy = (g: GameState): GameState => ({ ...g, upgrades: FULL_PARKING });
 
 function carsWithIds(ids: readonly number[]): Car[] {
   return ids.map((id) => ({ id, dailyPrice: 60_00, dailyCost: 25_00, rented: false }));
@@ -563,7 +571,7 @@ describe("buyCar", () => {
   });
 
   it("spam buying until broke: cash never negative, ends with InsufficientCashError", () => {
-    let g = createGame(1);
+    let g = roomy(createGame(1));
     let n = 0;
     for (;;) {
       try {
@@ -580,7 +588,7 @@ describe("buyCar", () => {
   });
 
   it("buying up to 50 cars gives unique contiguous ids", () => {
-    let g = createGame(1, 10 ** 12);
+    let g = roomy(createGame(1, 10 ** 12));
     for (let i = 0; i < MAX_FLEET_SIZE; i++) g = buyCar(g, "used");
     expect(g.fleet.map((c) => c.id)).toEqual(Array.from({ length: 50 }, (_, i) => i + 1));
     expect(thrown(() => buyCar(g, "used"))).toBeInstanceOf(FleetFullError);

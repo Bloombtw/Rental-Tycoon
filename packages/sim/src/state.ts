@@ -5,6 +5,7 @@ import {
   type CarModelId,
 } from "./economy.js";
 import { InvalidFleetError, InvalidSeedError, InvalidStartingCashError } from "./errors.js";
+import { NO_UPGRADES, parkingLevelFor, type Upgrades } from "./upgrades.js";
 
 /** Money is always an integer number of cents. Never use floats for money. */
 export type Cents = number;
@@ -49,6 +50,8 @@ export interface GameState {
   readonly todayRevenue: Cents;
   /** Customers still to come today (drawn at opening). */
   readonly customersLeft: number;
+  /** Level of each upgrade (upgrades.md). */
+  readonly upgrades: Upgrades;
   readonly fleet: readonly Car[];
   /** Report of the last closed day; null before the first closing. */
   readonly lastDay: DayReport | null;
@@ -106,6 +109,7 @@ export function createGame(
     cash: startingCash,
     todayRevenue: 0,
     customersLeft: 0, // drawn when minute 0 is processed
+    upgrades: { ...NO_UPGRADES, parking: parkingLevelFor(cars.length) },
     fleet: cars,
     lastDay: null,
   };

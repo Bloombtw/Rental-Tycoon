@@ -61,7 +61,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 ## Phase 2 — Priorités avant le rendu (dans cet ordre)
 
 1. ✅ **Feedback de gain** : « +90 € » flottants au-dessus des voitures qui partent, compteur de caisse animé, pièces qui volent vers le HUD.
-2. ⬜ **Améliorations à coût croissant** (courbe exponentielle) : agrandir le parking (remplace le plafond fixe `MAX_FLEET_SIZE`), comptoir plus rapide, publicité (+ demande), station de lavage (+ prix accepté).
+2. ✅ **Améliorations à coût croissant** (`upgrades.md`) (courbe exponentielle) : agrandir le parking (remplace le plafond fixe `MAX_FLEET_SIZE`), comptoir plus rapide, publicité (+ demande), station de lavage (+ prix accepté).
 3. ⬜ **Clients visibles** dans la vue 3D : petits personnages qui arrivent au comptoir, repartent avec une voiture ou repartent déçus (prix trop élevé).
 4. ⬜ **Niveau d'agence / XP** qui débloque de nouveaux modèles : SUV, utilitaire, électrique, cabriolet, luxe. Le catalogue s'ouvre progressivement.
 5. ⬜ **Tutoriel guidé** (première minute : acheter, tarifer, lancer le temps, lire le bilan), remplace le message d'accueil.

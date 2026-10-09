@@ -8,6 +8,7 @@ import {
 } from "./economy.js";
 import { InvalidMinutesError, SimOverflowError } from "./errors.js";
 import { createRng, type Rng } from "./rng.js";
+import { adsBonusPct, boostedAcceptance, washedReference } from "./upgrades.js";
 import type { Car, GameState, RentalOutcome } from "./state.js";
 
 /** Opening hours 09:00 -> 21:00, in game minutes. */
@@ -77,7 +78,8 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   const depart = (from: number, to: number): void => {
     if (to <= from) return;
     if (from === 0) {
-      const pct = draw().int(DEMAND_MIN_PCT, DEMAND_MAX_PCT);
+      const ads = adsBonusPct(state.upgrades);
+      const pct = draw().int(DEMAND_MIN_PCT + ads, DEMAND_MAX_PCT + ads);
       customersLeft = DEMAND_BASE + Math.round((state.fleet.length * pct) / 100);
     }
     const first = Math.ceil(from / DEPARTURE_STAGGER_MINUTES);
@@ -90,7 +92,11 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
         outcome = "noCustomer";
       } else {
         customersLeft -= 1;
-        const chance = acceptanceChance(car.dailyPrice, referencePrice(car));
+        const reference = washedReference(referencePrice(car), state.upgrades);
+        const chance = boostedAcceptance(
+          acceptanceChance(car.dailyPrice, reference),
+          state.upgrades,
+        );
         outcome = draw().next() < chance ? "rented" : "tooExpensive";
       }
       const rented = outcome === "rented";
@@ -134,6 +140,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     cash,
     todayRevenue,
     customersLeft,
+    upgrades: state.upgrades,
     fleet: copy ?? state.fleet,
     lastDay,
   };

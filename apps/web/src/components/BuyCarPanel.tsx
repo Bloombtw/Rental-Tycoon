@@ -10,6 +10,8 @@ import { PanelHeader } from "../ui/PanelHeader.js";
 interface BuyCarPanelProps {
   readonly cash: Cents;
   readonly fleetSize: number;
+  /** Places in the parking (upgrades.md). */
+  readonly capacity: number;
   readonly highlight: boolean;
   readonly onBuy: (model: CarModelId) => void;
 }
@@ -17,11 +19,12 @@ interface BuyCarPanelProps {
 export const BuyCarPanel = memo(function BuyCarPanel({
   cash,
   fleetSize,
+  capacity,
   highlight,
   onBuy,
 }: BuyCarPanelProps) {
   const baseId = useId();
-  const full = fleetSize >= MAX_FLEET_SIZE;
+  const full = fleetSize >= capacity;
   return (
     <section className="card panel" data-highlight={String(highlight)} aria-labelledby="buy-title">
       <PanelHeader icon="cart" tone="money" id="buy-title" title="Acheter une voiture" />
@@ -29,7 +32,9 @@ export const BuyCarPanel = memo(function BuyCarPanel({
         const model = CAR_MODELS[id];
         const poor = !(cash >= model.purchasePrice);
         const reason = full
-          ? `Flotte complète (${MAX_FLEET_SIZE}/${MAX_FLEET_SIZE})`
+          ? capacity >= MAX_FLEET_SIZE
+            ? `Flotte complète (${MAX_FLEET_SIZE}/${MAX_FLEET_SIZE})`
+            : `Parking plein (${fleetSize}/${capacity}) : agrandissez le parking`
           : poor
             ? "Fonds insuffisants"
             : null;
