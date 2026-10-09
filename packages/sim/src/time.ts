@@ -17,9 +17,22 @@ import {
 import { InvalidMinutesError, SimOverflowError } from "./errors.js";
 import { createRng, type Rng } from "./rng.js";
 import { adsBonusPct, boostedAcceptance, washedReference } from "./upgrades.js";
-import { managedFleet, managersSalary, salesBonusPct } from "./managers.js";
+import { managedFleet, managersSalary, mechanicHired, salesBonusPct } from "./managers.js";
 import { boostDemandPct, revenueMultiplier } from "./shop.js";
 import type { Car, GameState, RentalOutcome } from "./state.js";
+import {
+  breakdownChance,
+  carAge,
+  carCondition,
+  isBroken,
+  MECHANIC_SERVICE_BELOW,
+  mechanicRepairCost,
+  mechanicServiceCost,
+  repairedCar,
+  WEAR_PARKED,
+  WEAR_RENTED_MAX,
+  WEAR_RENTED_MIN,
+} from "./wear.js";
 
 /** Opening hours 09:00 -> 21:00, in game minutes. */
 export const DAY_MINUTES = 720;
@@ -108,6 +121,34 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
       const current = copy ?? state.fleet;
       const managed = managedFleet(current, state.managers, state.upgrades);
       if (managed !== current) copy = managed.slice();
+      // The mechanic works before the first departure, then the day's breakdowns are drawn.
+      const mechanic = mechanicHired(state.managers);
+      const fleetNow = copy ?? state.fleet;
+      let worked: Car[] | null = null;
+      for (let i = 0; i < fleetNow.length; i++) {
+        const car = fleetNow[i];
+        if (car === undefined) continue;
+        let next: Car = car;
+        let repaired = false;
+        if (mechanic && isBroken(car)) {
+          cash -= mechanicRepairCost(car);
+          next = repairedCar(car);
+          repaired = true;
+        } else if (mechanic && carCondition(car) < MECHANIC_SERVICE_BELOW) {
+          cash -= mechanicServiceCost(car);
+          next = { ...car, condition: 100 };
+        }
+        if (!Number.isSafeInteger(cash)) throw new SimOverflowError("cash");
+        // No draw for a car at 100 % (new fleets leave the rng untouched), nor for a car the
+        // mechanic just repaired: it does not break again the same morning.
+        const chance = repaired || isBroken(next) ? 0 : breakdownChance(next);
+        if (chance > 0 && draw().next() < chance) next = { ...next, broken: true };
+        if (next !== car) {
+          worked ??= fleetNow.slice();
+          worked[i] = next;
+        }
+      }
+      if (worked !== null) copy = worked;
     }
     const referencePct = eventReferencePct({ ...state, day, event });
     const first = Math.ceil(from / DEPARTURE_STAGGER_MINUTES);
@@ -116,7 +157,9 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
       const car = (copy ?? state.fleet)[i];
       if (car === undefined) continue;
       let outcome: RentalOutcome;
-      if (!(customersLeft > 0)) {
+      if (isBroken(car)) {
+        outcome = "broken"; // stays in the parking and takes no customer
+      } else if (!(customersLeft > 0)) {
         outcome = "noCustomer";
       } else {
         customersLeft -= 1;
@@ -158,6 +201,18 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     cash -= costs;
     if (!Number.isSafeInteger(cash)) throw new SimOverflowError("cash");
     lastDay = { revenue: todayRevenue, costs };
+    // Wear at closing: one more day, and the cars lose condition (more when rented).
+    const fleetNow = copy ?? state.fleet;
+    if (fleetNow.length > 0) {
+      copy = fleetNow.map((car) => {
+        const loss = car.rented ? draw().int(WEAR_RENTED_MIN, WEAR_RENTED_MAX) : WEAR_PARKED;
+        return {
+          ...car,
+          age: Math.min(carAge(car) + 1, Number.MAX_SAFE_INTEGER),
+          condition: Math.max(0, carCondition(car) - loss),
+        };
+      });
+    }
     todayRevenue = 0;
     day += 1;
     if (!Number.isSafeInteger(day)) throw new SimOverflowError("day");
@@ -180,6 +235,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     missions: state.missions,
     event,
     nextEventDay,
+    nextCarId: state.nextCarId,
     fleet: copy ?? state.fleet,
     lastDay,
   };

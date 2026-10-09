@@ -329,7 +329,7 @@ describe("events: save", () => {
   };
 
   it("is at version 9", () => {
-    expect(GAME_STATE_VERSION).toBe(9);
+    expect(GAME_STATE_VERSION).toBe(10);
   });
 
   it("round-trips a state with and without an active event", () => {

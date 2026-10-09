@@ -5,6 +5,7 @@ import {
   UPGRADES,
   buyCar,
   createGame,
+  departureMinute,
   tick,
   type Car,
   type CarModelId,
@@ -594,5 +595,87 @@ describe("events (events.md)", () => {
     );
     expect(s.notice).toBe("Vacances scolaires : Clients × 2.");
     expect(s.error).toBeNull();
+  });
+});
+
+describe("wear actions (resale-wear.md)", () => {
+  const worn = (extra: Partial<Car>): GameState => {
+    const g = buyCar({ ...createGame(1, 100_000_00) }, "compact");
+    const car = g.fleet[0];
+    if (!car) throw new Error("no car");
+    return { ...g, fleet: [{ ...car, ...extra }] };
+  };
+  const cash = (s: UiState): number => s.game.cash;
+
+  it("repairCar: pays, clears the breakdown, French notice", () => {
+    const game = worn({ broken: true, condition: 20 });
+    const s = gameReducer(initUiState(game), { type: "repairCar", carId: 1 });
+    expect(s.error).toBeNull();
+    expect(s.game.fleet[0]?.broken).toBe(false);
+    expect(cash(s)).toBeLessThan(game.cash);
+    expect(s.notice).toBe(`Voiture n°1 réparée pour ${formatCents(game.cash - cash(s))}.`);
+    expect(dirty(s.notice)).toBe(false);
+  });
+
+  it("repairCar on a working car: refused with a message, same game", () => {
+    const game = worn({});
+    const start = initUiState(game);
+    const s = gameReducer(start, { type: "repairCar", carId: 1 });
+    expect(s.game).toBe(game);
+    expect(s.error).toBe("Cette voiture n'est pas en panne.");
+    expect(s.notice).toBeNull();
+  });
+
+  it("serviceCar: condition back to 100 %, notice with the price paid", () => {
+    const game = worn({ condition: 60 });
+    const s = gameReducer(initUiState(game), { type: "serviceCar", carId: 1 });
+    expect(s.error).toBeNull();
+    expect(s.game.fleet[0]?.condition).toBe(100);
+    expect(s.notice).toBe(`Voiture n°1 entretenue pour ${formatCents(game.cash - cash(s))}.`);
+  });
+
+  it("serviceCar refused when broken or already at 100 %", () => {
+    const broken = gameReducer(initUiState(worn({ broken: true })), {
+      type: "serviceCar",
+      carId: 1,
+    });
+    expect(broken.error).toBe("Cette voiture est en panne : réparez-la d'abord.");
+    const perfect = gameReducer(initUiState(worn({})), { type: "serviceCar", carId: 1 });
+    expect(perfect.error).toBe("Cette voiture est déjà en parfait état.");
+  });
+
+  it("sellCar: the car leaves the fleet and the cash is credited", () => {
+    const game = worn({ age: 10, condition: 80 });
+    const s = gameReducer(initUiState(game), { type: "sellCar", carId: 1 });
+    expect(s.error).toBeNull();
+    expect(s.game.fleet).toHaveLength(0);
+    expect(cash(s)).toBeGreaterThan(game.cash);
+    expect(s.notice).toBe(`Voiture n°1 vendue pour ${formatCents(cash(s) - game.cash)}.`);
+  });
+
+  it("sellCar while out on a rental: refused with a message", () => {
+    const g = worn({ rented: true });
+    const game = { ...g, minute: (departureMinute(0) ?? 0) + 1 };
+    const s = gameReducer(initUiState(game), { type: "sellCar", carId: 1 });
+    expect(s.game).toBe(game);
+    expect(s.error).toBe("Cette voiture est en location : attendez son retour pour la vendre.");
+  });
+
+  it.each(["repairCar", "serviceCar", "sellCar"] as const)(
+    "%s with a forged or unknown id never throws nor corrupts the game",
+    (type) => {
+      const game = worn({ broken: true, condition: 10 });
+      for (const carId of [999, 0, -1, NaN, 1.5, "1", null, undefined]) {
+        const s = gameReducer(initUiState(game), forge({ type, carId }));
+        expect(s.game).toBe(game);
+        expect(dirty(s.error)).toBe(false);
+      }
+    },
+  );
+
+  it("sellCar then buyCar never reuses the id", () => {
+    let s = gameReducer(initUiState(worn({})), { type: "sellCar", carId: 1 });
+    s = gameReducer(s, { type: "buyCar", model: "compact" });
+    expect(s.game.fleet.map((c) => c.id)).not.toContain(1);
   });
 });

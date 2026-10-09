@@ -3,6 +3,10 @@ import {
   CAR_MODEL_IDS,
   PRODUCTS,
   BoosterUnaffordableError,
+  CarBrokenError,
+  CarInServiceError,
+  CarNotBrokenError,
+  CarRentedOutError,
   EVENTS,
   EVENT_KINDS,
   MissionNotReadyError,
@@ -165,6 +169,7 @@ export function missionNotice(completed: readonly Mission[]): string {
 export const MANAGER_LABELS: Readonly<Record<ManagerId, string>> = Object.freeze({
   sales: "Commercial",
   pricing: "Gérant",
+  mechanic: "Mécanicien",
 });
 
 /** Level-up message: the models it unlocks (agency-level.md). */
@@ -180,12 +185,42 @@ export function levelUpNotice(level: number): string {
 export function carStatusLabel(car: {
   readonly rented: boolean;
   readonly outcome?: unknown;
+  /** Current breakdown flag; when known it wins over a stale `outcome`. */
+  readonly broken?: unknown;
 }): string {
   if (car.rented === true) return "Louée";
+  if (car.broken === true) return "Au parking · en panne";
+  // A repaired car keeps its last outcome until its next slot: do not call it broken.
+  if (car.broken === false && car.outcome === "broken") return "Au parking";
   if (car.outcome === "tooExpensive") return "Au parking · trop cher";
   if (car.outcome === "noCustomer") return "Au parking · pas de client";
+  if (car.outcome === "broken") return "Au parking · en panne";
   return "Au parking";
 }
+
+/** Condition (0-100 %) as a whole number; anything else counts as 0. Never NaN. */
+export function conditionPct(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(100, Math.max(0, Math.round(value)))
+    : 0;
+}
+
+/** Colour band of the condition bar: green from 70 %, orange from 40 %, red below. */
+export function conditionTone(pct: number): "good" | "warn" | "bad" {
+  const p = conditionPct(pct);
+  if (p >= 70) return "good";
+  if (p >= 40) return "warn";
+  return "bad";
+}
+
+/** "12 j": age in days of a car; invalid values count as 0. */
+export function ageText(days: unknown): string {
+  const n = typeof days === "number" && Number.isSafeInteger(days) && days >= 0 ? days : 0;
+  return `${String(n)} j`;
+}
+
+/** Why a car cannot be sold right now. */
+export const SELL_BLOCKED_REASON = "En location : vente impossible";
 
 export const PRICE_FORMAT_ERROR = "Format invalide : saisissez un montant en euros, par ex. 89,90.";
 
@@ -242,6 +277,12 @@ export function errorMessage(error: unknown): string {
     if (error instanceof UnknownUpgradeError) return "Amélioration inconnue.";
     if (error instanceof UnknownCarModelError) return "Modèle de voiture inconnu.";
     if (error instanceof UnknownCarError) return "Cette voiture n'existe pas.";
+    if (error instanceof CarNotBrokenError) return "Cette voiture n'est pas en panne.";
+    if (error instanceof CarBrokenError) return "Cette voiture est en panne : réparez-la d'abord.";
+    if (error instanceof CarInServiceError) return "Cette voiture est déjà en parfait état.";
+    if (error instanceof CarRentedOutError) {
+      return "Cette voiture est en location : attendez son retour pour la vendre.";
+    }
     if (error instanceof InvalidPriceError) return PRICE_RANGE_ERROR;
     if (error instanceof SimOverflowError) {
       return "La simulation a atteint une limite numérique : action annulée.";

@@ -24,6 +24,11 @@ const TEXT: Readonly<Record<ManagerId, { name: string; role: string; icon: IconN
     role: "Fixe chaque matin le prix le plus rentable de chaque voiture.",
     icon: "tag",
   },
+  mechanic: {
+    name: "Mécanicien",
+    role: "Répare les pannes à moitié prix et entretient les voitures usées.",
+    icon: "wrench",
+  },
 };
 
 interface ManagersPanelProps {

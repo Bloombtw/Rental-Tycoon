@@ -12,3 +12,4 @@ export * from "./managers.js";
 export * from "./missions.js";
 export * from "./time.js";
 export * from "./upgrades.js";
+export * from "./wear.js";

@@ -83,14 +83,22 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 1. ✅ **Missions** (`missions.md`) : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
 2. ✅ **Événements** (`events.md`) : vacances (demande ×2), salon de l'auto, grève, tempête. Effet temporaire.
    - **Mis en avant par une petite bannière** en haut de l'écran, sous le HUD : icône dessinée, nom de l'événement, effet en clair (« Demande ×2 ») et compte à rebours ou durée restante. Elle entre en glissant, reste visible tant que l'événement dure, sans masquer la scène ni bloquer les taps. Un tap sur la bannière ouvre le détail. Couleur selon le type (bonus ou malus) via `tokens.css`. Au plus une bannière à la fois ; si plusieurs événements sont actifs, afficher le plus récent avec un badge « +1 ».
-3. ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
 
-## Plus tard (si le temps le permet)
+## Avant le rendu (dans cet ordre, à faire maintenant)
+
+1. ✅ **Revente + usure** (`resale-wear.md`) : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
+2. ⬜ **Statistiques** : historique des jours, graphique de la caisse, rentabilité par modèle.
+3. ✅ **Nouvelle zone « en chantier » (vitrine uniquement, NE PAS développer la zone)** : montrer qu'une deuxième zone existe (ex. « Aéroport »), sans aucune mécanique de jeu derrière.
+   - Une entrée dans le menu latéral (ou sur la carte) avec une icône dessinée de chantier (cône, barrière, casque), le nom de la zone, un cadenas, et au tap le message « En chantier, revenez plus tard ! » (petite modale ou toast).
+   - Optionnel si c'est rapide : au bord de la scène 3D, une barrière de chantier et des cônes (assets Kenney `roads/` et `cars/cone`) avec un panneau « Prochainement ».
+   - Interdit : pas de nouvel état dans la sim, pas de deuxième agence, pas de bascule entre zones, rien à sauvegarder. Juste de l'UI statique.
+4. ⬜ **Passe de finition** : plus aucune nouvelle fonctionnalité. Parcourir le jeu comme un joueur sur iPhone (390 px portrait) : bugs, textes, chevauchements, NaN, écrans vides, performances. Corriger, puis faire les captures du rendu dans `screenshots/` (tutoriel, HUD, boutique, événement, statistiques, zone en chantier). Nettoyer les fichiers qui traînent à la racine.
+
+## Après le rendu
 
 - ✅ **Sons** (`sounds.md`) : musique de fond, ambiance de ville, son d'encaissement, bouton son dans le HUD. Vibrations non faites (Safari iOS ne les permet pas).
-- ⬜ **Nouvelles agences** (centre-ville, gare, aéroport) avec demande et clientèle différentes ; on bascule de l'une à l'autre.
+- ⬜ **Nouvelles agences** (centre-ville, gare, aéroport) avec demande et clientèle différentes ; on bascule de l'une à l'autre. Remplacera la zone « en chantier ».
 - ⬜ **Crédit et faillite** : emprunt pour acheter au-delà de la caisse, game over après X jours de découvert.
-- ⬜ **Statistiques** : historique des jours, graphique de la caisse, rentabilité par modèle.
 - ⬜ **Prestige** : revendre l'entreprise contre un bonus permanent et recommencer plus vite.
 
 ## Règles pour l'agent lead

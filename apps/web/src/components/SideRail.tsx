@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Icon, type IconName } from "../ui/icons.js";
 
 /** The menus reachable from the side rail (side-menu.md). */
@@ -40,6 +41,17 @@ export function SideRail({
   onOpenShop,
   top,
 }: SideRailProps) {
+  // "Aéroport": a locked zone under construction (showcase only, no game mechanics).
+  const [soon, setSoon] = useState(false);
+  useEffect(() => {
+    if (!soon) return undefined;
+    const t = setTimeout(() => {
+      setSoon(false);
+    }, 2500);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [soon]);
   return (
     <nav
       className="side-rail"
@@ -90,6 +102,31 @@ export function SideRail({
           </button>
         );
       })}
+      <button
+        type="button"
+        className="rail-btn"
+        data-kind="locked"
+        data-testid="rail-airport"
+        aria-label="Aéroport : en chantier"
+        onClick={() => {
+          setSoon(true);
+        }}
+      >
+        <span className="rail-circle" aria-hidden="true">
+          <Icon name="construction" size={24} />
+          <span className="rail-lock">
+            <Icon name="lock" size={16} />
+          </span>
+        </span>
+        <span className="rail-label" aria-hidden="true">
+          Aéroport
+        </span>
+      </button>
+      {soon && (
+        <p className="rail-soon" role="status" data-testid="airport-soon">
+          En chantier, revenez plus tard !
+        </p>
+      )}
     </nav>
   );
 }

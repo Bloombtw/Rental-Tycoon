@@ -108,6 +108,7 @@ function stateOf(
     missions: INITIAL_MISSIONS,
     event: null,
     nextEventDay: 3,
+    nextCarId: fleet.length + 1,
     fleet,
     lastDay: null,
     ...extra,
@@ -132,6 +133,7 @@ const STATE_KEYS = [
   "missions",
   "event",
   "nextEventDay",
+  "nextCarId",
 ].sort();
 
 /** Parking at its maximum (50 places) so the tests can buy freely (upgrades.md). */
@@ -315,7 +317,15 @@ describe("tick and the optional model property", () => {
     const g = tick(tick(createGame(1, C, MIXED)));
     for (const c of g.fleet) {
       expect("model" in c).toBe(false);
-      expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "outcome", "rented"]);
+      expect(Object.keys(c).sort()).toEqual([
+        "age",
+        "condition",
+        "dailyCost",
+        "dailyPrice",
+        "id",
+        "outcome",
+        "rented",
+      ]);
     }
   });
 
@@ -384,7 +394,11 @@ describe("buyCar", () => {
     expect((buyCar(stateOf(carsWithIds([5, 2])), "used").fleet[2] as Car).id).toBe(6);
     expect((buyCar(stateOf(carsWithIds([2, 5])), "used").fleet[2] as Car).id).toBe(6);
     expect((buyCar(stateOf(carsWithIds([1, 100, 3])), "used").fleet[3] as Car).id).toBe(101);
-    expect((buyCar(stateOf(carsWithIds([0])), "used").fleet[1] as Car).id).toBe(1);
+    // nextCarId wins over the fleet when it is higher (ids are never reused)
+    expect((buyCar(stateOf(carsWithIds([0])), "used").fleet[1] as Car).id).toBe(2);
+    expect(
+      (buyCar(stateOf(carsWithIds([0]), C, { nextCarId: 1 }), "used").fleet[1] as Car).id,
+    ).toBe(1);
   });
 
   it("ids [1, 3] then two buys never collide", () => {
@@ -528,9 +542,10 @@ describe("buyCar", () => {
     }
   });
 
-  it("MAX_SAFE_INTEGER - 1 is the last id that can still be bumped", () => {
-    const g = buyCar(stateOf(carsWithIds([Number.MAX_SAFE_INTEGER - 1])), "used");
-    expect((g.fleet[1] as Car).id).toBe(Number.MAX_SAFE_INTEGER);
+  it("MAX_SAFE_INTEGER - 2 is the last id that can still be bumped (nextCarId must stay safe)", () => {
+    const g = buyCar(stateOf(carsWithIds([Number.MAX_SAFE_INTEGER - 2])), "used");
+    expect((g.fleet[1] as Car).id).toBe(Number.MAX_SAFE_INTEGER - 1);
+    expect(g.nextCarId).toBe(Number.MAX_SAFE_INTEGER);
     expect(thrown(() => buyCar(g, "used"))).toBeInstanceOf(SimOverflowError);
   });
 

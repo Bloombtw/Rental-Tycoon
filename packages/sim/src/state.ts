@@ -28,14 +28,21 @@ export interface Car {
   readonly rented: boolean;
   /** What happened at its last departure slot; absent before its first slot. */
   readonly outcome?: RentalOutcome;
+  /** Days owned; absent = 0 (resale-wear.md). */
+  readonly age?: number;
+  /** Condition in percent, 0..100; absent = 100. */
+  readonly condition?: number;
+  /** Broken down, waiting for a repair; absent = false. */
+  readonly broken?: boolean;
 }
 
-export type RentalOutcome = "rented" | "tooExpensive" | "noCustomer";
+export type RentalOutcome = "rented" | "tooExpensive" | "noCustomer" | "broken";
 
 export const RENTAL_OUTCOMES: readonly RentalOutcome[] = Object.freeze([
   "rented",
   "tooExpensive",
   "noCustomer",
+  "broken",
 ] as const);
 
 export interface NewCar {
@@ -71,6 +78,8 @@ export interface GameState {
   readonly event: ActiveEvent | null;
   /** First day on which a new event may start (events.md). */
   readonly nextEventDay: number;
+  /** Id the next bought car gets; ids are never reused, even after a sale (resale-wear.md). */
+  readonly nextCarId: number;
   readonly fleet: readonly Car[];
   /** Report of the last closed day; null before the first closing. */
   readonly lastDay: DayReport | null;
@@ -136,6 +145,7 @@ export function createGame(
     missions: INITIAL_MISSIONS,
     event: null,
     nextEventDay: FIRST_EVENT_DAY,
+    nextCarId: cars.length + 1,
     fleet: cars,
     lastDay: null,
   };

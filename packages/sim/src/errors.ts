@@ -23,7 +23,11 @@ export type SimErrorCode =
   | "INVALID_RECEIPT"
   | "PRODUCT_ALREADY_OWNED"
   | "BOOSTER_UNAFFORDABLE"
-  | "MISSION_NOT_READY";
+  | "MISSION_NOT_READY"
+  | "CAR_NOT_BROKEN"
+  | "CAR_BROKEN"
+  | "CAR_IN_SERVICE"
+  | "CAR_RENTED_OUT";
 
 /** Base class of every typed sim error. Extends RangeError for compatibility. */
 export abstract class SimError extends RangeError {
@@ -276,5 +280,53 @@ export class InvalidPriceError extends SimError {
     super("dailyPrice must be a safe integer of cents between 0 and MAX_CAR_DAILY_PRICE");
     this.name = "InvalidPriceError";
     this.dailyPrice = dailyPrice;
+  }
+}
+
+/** Repairing a car that is not broken down. */
+export class CarNotBrokenError extends SimError {
+  readonly code = "CAR_NOT_BROKEN" as const;
+  readonly carId: unknown;
+
+  constructor(carId: unknown) {
+    super("the car is not broken down");
+    this.name = "CarNotBrokenError";
+    this.carId = carId;
+  }
+}
+
+/** Servicing a car that is broken down: repair it first. */
+export class CarBrokenError extends SimError {
+  readonly code = "CAR_BROKEN" as const;
+  readonly carId: unknown;
+
+  constructor(carId: unknown) {
+    super("the car is broken down: repair it first");
+    this.name = "CarBrokenError";
+    this.carId = carId;
+  }
+}
+
+/** Servicing a car that is already at 100 % condition. */
+export class CarInServiceError extends SimError {
+  readonly code = "CAR_IN_SERVICE" as const;
+  readonly carId: unknown;
+
+  constructor(carId: unknown) {
+    super("the car is already in perfect condition");
+    this.name = "CarInServiceError";
+    this.carId = carId;
+  }
+}
+
+/** Selling a car that is out on a rental. */
+export class CarRentedOutError extends SimError {
+  readonly code = "CAR_RENTED_OUT" as const;
+  readonly carId: unknown;
+
+  constructor(carId: unknown) {
+    super("the car is out on a rental");
+    this.name = "CarRentedOutError";
+    this.carId = carId;
   }
 }

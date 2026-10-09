@@ -15,6 +15,9 @@ import {
   levelForXp,
   claimMission,
   setCarPrice,
+  repairCar,
+  serviceCar,
+  sellCar,
   type BoosterId,
   type ManagerId,
   type Receipt,
@@ -83,6 +86,9 @@ export interface UiState {
 export type GameAction =
   | { type: "buyCar"; model: CarModelId }
   | { type: "setCarPrice"; carId: CarId; dailyPrice: Cents }
+  | { type: "repairCar"; carId: CarId }
+  | { type: "serviceCar"; carId: CarId }
+  | { type: "sellCar"; carId: CarId }
   | { type: "buyUpgrade"; upgrade: UpgradeId }
   | { type: "hireManager"; manager: ManagerId }
   | { type: "fireManager"; manager: ManagerId }
@@ -265,6 +271,10 @@ function returnAfter(state: UiState, elapsedMs: unknown): UiState {
   };
 }
 
+function carNo(id: unknown): string {
+  return typeof id === "number" && Number.isSafeInteger(id) ? String(id) : "—";
+}
+
 function applyAction(game: GameState, action: GameAction): { game: GameState; notice: string } {
   switch (action.type) {
     case "buyCar": {
@@ -283,6 +293,27 @@ function applyAction(game: GameState, action: GameAction): { game: GameState; no
       return {
         game: next,
         notice: `Prix de la voiture n°${action.carId} fixé à ${formatCents(applied?.dailyPrice ?? 0)}/jour.`,
+      };
+    }
+    case "repairCar": {
+      const next = repairCar(game, action.carId);
+      return {
+        game: next,
+        notice: `Voiture n°${carNo(action.carId)} réparée pour ${formatCents(Math.max(0, game.cash - next.cash))}.`,
+      };
+    }
+    case "serviceCar": {
+      const next = serviceCar(game, action.carId);
+      return {
+        game: next,
+        notice: `Voiture n°${carNo(action.carId)} entretenue pour ${formatCents(Math.max(0, game.cash - next.cash))}.`,
+      };
+    }
+    case "sellCar": {
+      const next = sellCar(game, action.carId);
+      return {
+        game: next,
+        notice: `Voiture n°${carNo(action.carId)} vendue pour ${formatCents(Math.max(0, next.cash - game.cash))}.`,
       };
     }
     case "claimMission": {
@@ -426,6 +457,9 @@ function reduce(state: UiState, action: GameAction): UiState {
       return state.paused ? state : { ...state, paused: true };
     case "buyCar":
     case "setCarPrice":
+    case "repairCar":
+    case "serviceCar":
+    case "sellCar":
     case "buyUpgrade":
     case "hireManager":
     case "fireManager":

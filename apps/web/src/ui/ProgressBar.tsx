@@ -5,7 +5,7 @@ interface ProgressBarProps {
   readonly max: number;
   /** Accessible name. */
   readonly label: string;
-  readonly tone?: "day" | "money" | "primary";
+  readonly tone?: "day" | "money" | "primary" | "warn" | "danger";
   readonly thin?: boolean;
 }
 

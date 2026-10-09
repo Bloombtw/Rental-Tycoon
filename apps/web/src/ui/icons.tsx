@@ -36,6 +36,7 @@ export type IconName =
   | "bolt"
   | "sound-on"
   | "sound-off"
+  | "construction"
   | "event-holidays"
   | "event-show"
   | "event-strike"
@@ -99,6 +100,20 @@ function glyph(name: IconName): JSX.Element {
           <path d="M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11z" />
           <path d="M5.5 14v6h13v-6" />
           <path d="M10 20v-4h4v4" />
+        </>
+      );
+    case "construction":
+      return (
+        <>
+          <path
+            d="M12 3l-5 15h10z"
+            style={{ fill: "var(--c-primary-500)", stroke: "var(--c-primary-700)" }}
+          />
+          <path
+            d="M9.4 11h5.2M8.4 14.5h7.2"
+            style={{ stroke: "var(--c-on-dark)", strokeWidth: 1.6 }}
+          />
+          <path d="M4 20h16" />
         </>
       );
     case "sound-on":

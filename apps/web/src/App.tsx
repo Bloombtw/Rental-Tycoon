@@ -433,6 +433,15 @@ export function App(props: {
   const onSetPrice = useCallback((carId: CarId, dailyPrice: Cents) => {
     dispatch({ type: "setCarPrice", carId, dailyPrice });
   }, []);
+  const onRepairCar = useCallback((carId: CarId) => {
+    dispatch({ type: "repairCar", carId });
+  }, []);
+  const onServiceCar = useCallback((carId: CarId) => {
+    dispatch({ type: "serviceCar", carId });
+  }, []);
+  const onSellCar = useCallback((carId: CarId) => {
+    dispatch({ type: "sellCar", carId });
+  }, []);
   const onBuy = useCallback((model: CarModelId) => {
     dispatch({ type: "buyCar", model });
   }, []);
@@ -522,7 +531,13 @@ export function App(props: {
         capacity={capacity}
         onSetOpen={onSetDrawerOpen}
       >
-        <FleetPanel fleet={game.fleet} onSetPrice={onSetPrice} />
+        <FleetPanel
+          game={game}
+          onSetPrice={onSetPrice}
+          onRepair={onRepairCar}
+          onService={onServiceCar}
+          onSell={onSellCar}
+        />
       </ManageDrawer>
       <SideRail
         active={panel}

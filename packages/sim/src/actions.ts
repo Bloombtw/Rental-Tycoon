@@ -24,13 +24,15 @@ export function buyCar(state: GameState, model: CarModelId): GameState {
   if (state.cash < spec.purchasePrice) {
     throw new InsufficientCashError(spec.purchasePrice, state.cash);
   }
-  let maxId = 0;
+  // Ids are never reused: nextCarId, but never below the highest id in the fleet (legacy fixtures).
+  let id = Number.isSafeInteger(state.nextCarId) ? state.nextCarId : 1;
   for (const car of state.fleet) {
     // NaN propagates through Math.max and is caught below.
-    maxId = Math.max(maxId, car.id);
+    id = Math.max(id, car.id + 1);
   }
-  const id = maxId + 1;
-  if (!Number.isSafeInteger(id)) throw new SimOverflowError("carId");
+  if (!Number.isSafeInteger(id) || !Number.isSafeInteger(id + 1)) {
+    throw new SimOverflowError("carId");
+  }
   const bought: Car = {
     id,
     model,
@@ -41,6 +43,7 @@ export function buyCar(state: GameState, model: CarModelId): GameState {
   return {
     ...state,
     cash: state.cash - spec.purchasePrice,
+    nextCarId: id + 1,
     fleet: [...state.fleet, bought],
   };
 }

@@ -582,7 +582,10 @@ describe("buying and pricing during the day", () => {
     const g = at(createGame(1, CASH, fleetOf(3)), 3);
     const late = setCarPrice(g, 2, 200_00);
     const closed = advanceMinutes(late, 717);
-    expect(closed.fleet[1]).toEqual({ ...g.fleet[1], dailyPrice: 200_00 }); // today's outcome kept
+    // today's outcome kept; the closing wore the car (resale-wear.md)
+    expect(closed.fleet[1]).toMatchObject({ ...g.fleet[1], dailyPrice: 200_00, age: 1 });
+    expect(closed.fleet[1]?.condition).toBeGreaterThanOrEqual(95);
+    expect(closed.fleet[1]?.condition).toBeLessThanOrEqual(98);
     expect(closed.lastDay?.revenue).toBe(
       revenueOf(closed.fleet.map((c, i) => (i === 1 ? { ...c, dailyPrice: 60_00 } : c))),
     );

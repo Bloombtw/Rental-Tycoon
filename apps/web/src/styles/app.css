@@ -673,6 +673,14 @@ input {
   background: var(--g-money);
 }
 
+.progress[data-tone="warn"] .progress-fill {
+  background: var(--g-gold);
+}
+
+.progress[data-tone="danger"] .progress-fill {
+  background: var(--g-danger);
+}
+
 /* ---------------------------------------------------------------- toasts */
 .toast {
   display: flex;
@@ -1306,6 +1314,71 @@ input {
 
 .badge[data-status="parked"] {
   background: var(--c-ink-muted);
+}
+
+.badge[data-status="broken"] {
+  background: var(--c-danger-text);
+}
+
+.car-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+/* Wear (resale-wear.md): condition bar and the repair / service / sell buttons. */
+.car-condition {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.car-condition .progress {
+  height: 8px;
+}
+
+.car-condition-label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  color: var(--c-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.car-condition[data-tone="good"] strong {
+  color: var(--c-money-strong);
+}
+
+.car-condition[data-tone="warn"] strong {
+  color: var(--c-ink);
+}
+
+.car-condition[data-tone="bad"] strong {
+  color: var(--c-danger-text);
+}
+
+.car-condition[data-pop="true"] .progress {
+  animation: pop var(--dur-base) var(--ease-spring);
+}
+
+.car-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.car-action {
+  flex: 1 1 auto;
+  min-height: var(--tap);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.car-action-hint {
+  margin: 0;
+  color: var(--c-ink-muted);
+  font-size: var(--fs-sm);
 }
 
 .badge[data-pop="true"] {
@@ -2987,4 +3060,43 @@ input {
   .tut-root *::after {
     animation: none !important;
   }
+}
+
+/* Zone under construction (showcase only): striped, locked, a short message on tap. */
+.rail-btn[data-kind="locked"] .rail-circle {
+  background: repeating-linear-gradient(-45deg, var(--c-gold-300) 0 6px, var(--c-asphalt) 6px 12px);
+  box-shadow:
+    0 4px 0 var(--c-gold-700),
+    var(--elev-2);
+}
+
+.rail-lock {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--c-on-dark);
+  color: var(--c-ink);
+  box-shadow: var(--elev-2);
+}
+
+.rail-soon {
+  position: absolute;
+  right: calc(100% + var(--space-2));
+  bottom: 0;
+  width: 180px;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--glass-dark-opaque);
+  color: var(--c-on-dark);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  box-shadow: var(--elev-3);
+  pointer-events: none;
+  animation: pop-in var(--dur-base) var(--ease-spring);
 }

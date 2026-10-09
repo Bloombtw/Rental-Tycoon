@@ -762,11 +762,27 @@ describe("tick: revenue", () => {
         "upgrades",
         "xp",
       ]
-        .concat(["managers", "dailyReward", "shop", "missions", "event", "nextEventDay"])
+        .concat([
+          "managers",
+          "dailyReward",
+          "shop",
+          "missions",
+          "event",
+          "nextEventDay",
+          "nextCarId",
+        ])
         .sort(),
     );
     for (const c of t.fleet) {
-      expect(Object.keys(c).sort()).toEqual(["dailyCost", "dailyPrice", "id", "outcome", "rented"]);
+      expect(Object.keys(c).sort()).toEqual([
+        "age",
+        "condition",
+        "dailyCost",
+        "dailyPrice",
+        "id",
+        "outcome",
+        "rented",
+      ]);
     }
   });
 
@@ -1082,7 +1098,11 @@ describe("advance", () => {
 // ---------------------------------------------------------------------------
 describe("overflow", () => {
   it("positive overflow at the edge (live cash): day 1 succeeds, day 2 overflows at car 2's slot", () => {
-    const g = createGame(1, Number.MAX_SAFE_INTEGER - 150_00, PROFITABLE);
+    const g = createGame(
+      2, // seed 2: both cars are rented on day 2 (wear draws shift the stream)
+      Number.MAX_SAFE_INTEGER - 150_00,
+      PROFITABLE,
+    );
     const copy = clone(g);
     expect(advance(g, 1).cash).toBe(Number.MAX_SAFE_INTEGER - 65_00);
     expectOverflow(() => advance(g, 2), "cash");

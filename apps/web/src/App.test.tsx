@@ -579,7 +579,13 @@ describe("App: days go by", () => {
   }, 60_000); // ~2160 committed frames rendering the full HUD and drawer: slow under jsdom
 
   it("a long hung frame at x10 never skips a closing: the report is still consistent", () => {
-    mountApp(createGame(1, 0, IDLE));
+    // Priced at the maximum so that no random customer ever rents them, whatever the rng stream.
+    mountApp(
+      createGame(1, 0, [
+        { dailyPrice: MAX_CAR_DAILY_PRICE, dailyCost: 30_00 },
+        { dailyPrice: MAX_CAR_DAILY_PRICE, dailyCost: 20_00 },
+      ]),
+    );
     clickId("speed-10");
     for (let i = 0; i < 40; i++) driver.frames(1, 5_000);
     const m = /^Jour (\d+) · /.exec(text("hud-clock"));

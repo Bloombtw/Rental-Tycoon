@@ -119,3 +119,20 @@ describe("carTooltip", () => {
     expect(() => carTooltip(Object.freeze(car()), 0, 1)).not.toThrow();
   });
 });
+
+describe("carTooltip: breakdown (resale-wear.md)", () => {
+  it("a parked broken car says so, from the outcome or the flag", () => {
+    expect(carTooltip(car({ rented: false, outcome: "broken" }), 0, 100).status).toBe(
+      "Au parking · en panne",
+    );
+    expect(carTooltip(car({ rented: false, broken: true }), 0, 100).status).toBe(
+      "Au parking · en panne",
+    );
+  });
+
+  it("a repaired car is no longer reported as broken", () => {
+    const t = carTooltip(car({ rented: false, broken: false, outcome: "broken" }), 0, 100);
+    expect(t.status).toBe("Au parking");
+    expect(junk(all(t))).toBe(false);
+  });
+});

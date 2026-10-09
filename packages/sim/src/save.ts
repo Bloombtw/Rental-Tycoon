@@ -47,7 +47,7 @@ import {
 } from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 9;
+export const GAME_STATE_VERSION = 10;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -136,11 +136,23 @@ function parseCar(raw: unknown, index: number, seen: Set<number>): Car {
     }
   }
 
-  const car: Car =
+  let car: Car =
     model === undefined
       ? { id, dailyPrice, dailyCost, rented }
       : { id, model, dailyPrice, dailyCost, rented };
-  return outcome === undefined ? car : { ...car, outcome };
+  if (outcome !== undefined) car = { ...car, outcome };
+  if (hasOwn(raw, "age")) {
+    car = { ...car, age: int(own(raw, "age"), `${p}.age`, 0, Number.MAX_SAFE_INTEGER) };
+  }
+  if (hasOwn(raw, "condition")) {
+    car = { ...car, condition: int(own(raw, "condition"), `${p}.condition`, 0, 100) };
+  }
+  if (hasOwn(raw, "broken")) {
+    const broken = own(raw, "broken");
+    if (typeof broken !== "boolean") throw new InvalidGameStateError(`${p}.broken`, "type");
+    car = { ...car, broken };
+  }
+  return car;
 }
 
 /** Most customers a day can draw (full fleet, top of the demand range). */
@@ -201,6 +213,11 @@ function parse(raw: unknown): GameState {
   if ((lastDay === null) !== (day === 0))
     throw new InvalidGameStateError("lastDay", "inconsistent");
 
+  const nextCarId = int(own(raw, "nextCarId"), "nextCarId", 1, Number.MAX_SAFE_INTEGER);
+  if (fleet.some((car) => car.id >= nextCarId)) {
+    throw new InvalidGameStateError("nextCarId", "inconsistent");
+  }
+
   const upgrades = parseUpgrades(own(raw, "upgrades"));
   if (fleet.length > fleetCapacity(upgrades)) {
     throw new InvalidGameStateError("upgrades.parking", "inconsistent");
@@ -229,8 +246,31 @@ function parse(raw: unknown): GameState {
     missions,
     event,
     nextEventDay,
+    nextCarId,
     fleet,
     lastDay,
+  };
+}
+
+/**
+ * v9 → v10: adds `nextCarId` (above every id), the mechanic slot in `managers`. The new car
+ * fields are optional (absent = new car), so the cars stay as they are.
+ */
+function migrateV9(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const fleet = own(raw, "fleet");
+  let maxId = 0;
+  if (Array.isArray(fleet)) {
+    for (const car of fleet as unknown[]) {
+      const id = isRecord(car) ? own(car, "id") : undefined;
+      if (typeof id === "number" && Number.isSafeInteger(id) && id > maxId) maxId = id;
+    }
+  }
+  const managers = own(raw, "managers");
+  return {
+    ...raw,
+    nextCarId: maxId + 1,
+    managers: isRecord(managers) ? { mechanic: false, ...managers } : managers,
   };
 }
 
@@ -421,6 +461,7 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
     if (stateVersion < 7) data = migrateV6(data);
     if (stateVersion < 8) data = migrateV7(data);
     if (stateVersion < 9) data = migrateV8(data);
+    if (stateVersion < 10) data = migrateV9(data);
   } catch {
     throw new InvalidGameStateError("$", "type");
   }

@@ -35,6 +35,7 @@ const state = (day: number, minute: number, fleet: readonly Car[]): GameState =>
   missions: INITIAL_MISSIONS,
   event: null,
   nextEventDay: 3,
+  nextCarId: fleet.length + 1,
   fleet,
   lastDay: day === 0 ? null : { revenue: 0, costs: 0 },
 });

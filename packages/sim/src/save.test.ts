@@ -157,7 +157,7 @@ describe("validateGameState", () => {
       rented: false,
     }));
     const upgrades = { parking: 9, counter: 0, ads: 0, wash: 0 };
-    expect(validateGameState({ ...base, upgrades, fleet }).fleet).toHaveLength(50);
+    expect(validateGameState({ ...base, upgrades, fleet, nextCarId: 51 }).fleet).toHaveLength(50);
     // More cars than the parking holds is inconsistent.
     expect(() => validateGameState({ ...base, fleet })).toThrow(InvalidGameStateError);
   });

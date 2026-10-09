@@ -26,6 +26,12 @@ import {
 
 const CASH = 100_000_00;
 
+/** A diligent owner: every car serviced and repaired before the day (wear is tested in wear.test.ts). */
+const healthy = (g: GameState): GameState => ({
+  ...g,
+  fleet: g.fleet.map((c) => ({ ...c, condition: 100, broken: false })),
+});
+
 function fleetOf(n: number, dailyPrice: number, dailyCost = 10_00): NewCar[] {
   return Array.from({ length: n }, () => ({ dailyPrice, dailyCost }));
 }
@@ -52,8 +58,8 @@ describe("constants", () => {
     expect(DEMAND_MIN_PCT).toBe(70);
     expect(DEMAND_MAX_PCT).toBe(115);
     expect(FIXTURE_REFERENCE_PRICE).toBe(90_00);
-    expect(GAME_STATE_VERSION).toBe(9); // v3 upgrades … v7 shop, v8 missions, v9 events
-    expect([...RENTAL_OUTCOMES]).toEqual(["rented", "tooExpensive", "noCustomer"]);
+    expect(GAME_STATE_VERSION).toBe(10); // v3 upgrades … v8 missions, v9 events, v10 wear
+    expect([...RENTAL_OUTCOMES]).toEqual(["rented", "tooExpensive", "noCustomer", "broken"]);
   });
 });
 
@@ -186,7 +192,7 @@ describe("rental rate (acceptance criteria 2 and 3)", () => {
     if (quiet) g = { ...g, nextEventDay: Number.MAX_SAFE_INTEGER };
     let rented = 0;
     for (let d = 0; d < days; d++) {
-      g = tick(g);
+      g = tick(healthy(g));
       rented += g.fleet.filter((c) => c.rented).length;
     }
     return rented / (days * fleet.length);
@@ -209,7 +215,7 @@ describe("rental rate (acceptance criteria 2 and 3)", () => {
       };
       let rented = 0;
       for (let d = 0; d < 200; d++) {
-        g = tick(g);
+        g = tick(healthy(g));
         rented += g.fleet.filter((c) => c.rented).length;
       }
       const rate = rented / (200 * 20);

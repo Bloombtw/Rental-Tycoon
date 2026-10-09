@@ -10,13 +10,21 @@ import type { Car, Cents, GameState } from "./state.js";
 import { boostedAcceptance, washedReference, type Upgrades } from "./upgrades.js";
 
 /** Staff that automates the agency (managers.md). */
-export type ManagerId = "sales" | "pricing";
+export type ManagerId = "sales" | "pricing" | "mechanic";
 
-export const MANAGER_IDS: readonly ManagerId[] = Object.freeze(["sales", "pricing"] as const);
+export const MANAGER_IDS: readonly ManagerId[] = Object.freeze([
+  "sales",
+  "pricing",
+  "mechanic",
+] as const);
 
 export type Managers = Readonly<Record<ManagerId, boolean>>;
 
-export const NO_MANAGERS: Managers = Object.freeze({ sales: false, pricing: false });
+export const NO_MANAGERS: Managers = Object.freeze({
+  sales: false,
+  pricing: false,
+  mechanic: false,
+});
 
 export interface ManagerSpec {
   readonly id: ManagerId;
@@ -33,6 +41,12 @@ export const MANAGERS: Readonly<Record<ManagerId, ManagerSpec>> = Object.freeze(
     hireCost: 12_000_00,
     dailySalary: 120_00,
     unlockLevel: 3,
+  }),
+  mechanic: Object.freeze({
+    id: "mechanic",
+    hireCost: 10_000_00,
+    dailySalary: 100_00,
+    unlockLevel: 4,
   }),
 } as const satisfies Record<ManagerId, ManagerSpec>);
 
@@ -51,6 +65,10 @@ export function managersSalary(managers: Managers | undefined): Cents {
   let total = 0;
   for (const id of MANAGER_IDS) if (hired(managers, id)) total += MANAGERS[id].dailySalary;
   return total;
+}
+
+export function mechanicHired(managers: Managers | undefined): boolean {
+  return hired(managers, "mechanic");
 }
 
 export function salesBonusPct(managers: Managers | undefined): number {

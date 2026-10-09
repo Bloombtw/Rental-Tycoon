@@ -75,9 +75,20 @@ describe("effects", () => {
   it("the sales manager brings more revenue over time", () => {
     const fleet = Array.from({ length: 20 }, () => ({ dailyPrice: 90_00, dailyCost: 0 }));
     const base = { ...createGame(7, 0, fleet), xp: LEVEL_XP[1] ?? 0 };
-    const staffed: GameState = { ...base, managers: { sales: true, pricing: false } };
+    const staffed: GameState = {
+      ...base,
+      managers: { sales: true, pricing: false, mechanic: false },
+    };
     const salary = MANAGERS.sales.dailySalary * 100;
-    expect(advance(staffed, 100).cash + salary).toBeGreaterThan(advance(base, 100).cash);
+    // A diligent owner keeps the cars healthy: wear is not what this test is about.
+    const run = (start: GameState): GameState => {
+      let g = start;
+      for (let d = 0; d < 100; d++) {
+        g = tick({ ...g, fleet: g.fleet.map((c) => ({ ...c, condition: 100, broken: false })) });
+      }
+      return g;
+    };
+    expect(run(staffed).cash + salary).toBeGreaterThan(run(base).cash);
   });
 });
 
@@ -85,6 +96,10 @@ describe("save v5", () => {
   it("migrates a v4 save with nobody hired", () => {
     const v4 = JSON.parse(JSON.stringify(createGame(1))) as Record<string, unknown>;
     delete v4["managers"];
-    expect(restoreGameState(v4, 4).managers).toEqual({ sales: false, pricing: false });
+    expect(restoreGameState(v4, 4).managers).toEqual({
+      sales: false,
+      pricing: false,
+      mechanic: false,
+    });
   });
 });

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   CAR_MODEL_IDS,
+  CarBrokenError,
+  CarInServiceError,
+  CarNotBrokenError,
+  CarRentedOutError,
   EVENT_KINDS,
   type ActiveEvent,
   FleetFullError,
@@ -19,7 +23,10 @@ import {
   CAR_MODEL_LABELS,
   EVENT_LABELS,
   EVENT_SHORT_LABELS,
+  ageText,
   carStatusLabel,
+  conditionPct,
+  conditionTone,
   eventBannerText,
   eventEffectText,
   PRICE_FORMAT_ERROR,
@@ -201,5 +208,47 @@ describe("events", () => {
     ] as unknown as ActiveEvent[];
     for (const e of bad) expect(clean(eventBannerText(e))).toBe(true);
     expect(clean(eventEffectText("nope" as never))).toBe(true);
+  });
+});
+
+describe("wear messages (resale-wear.md)", () => {
+  it("typed errors map to French sentences", () => {
+    expect(errorMessage(new CarNotBrokenError(1))).toBe("Cette voiture n'est pas en panne.");
+    expect(errorMessage(new CarBrokenError(1))).toBe(
+      "Cette voiture est en panne : réparez-la d'abord.",
+    );
+    expect(errorMessage(new CarInServiceError(1))).toBe("Cette voiture est déjà en parfait état.");
+    expect(errorMessage(new CarRentedOutError(1))).toBe(
+      "Cette voiture est en location : attendez son retour pour la vendre.",
+    );
+  });
+
+  it("carStatusLabel: broken outcome or flag", () => {
+    expect(carStatusLabel({ rented: false, outcome: "broken" })).toBe("Au parking · en panne");
+    expect(carStatusLabel({ rented: false, broken: true })).toBe("Au parking · en panne");
+    // repaired since its last slot: the stale outcome is ignored
+    expect(carStatusLabel({ rented: false, broken: false, outcome: "broken" })).toBe("Au parking");
+    expect(carStatusLabel({ rented: true, broken: true })).toBe("Louée");
+  });
+
+  it("conditionTone thresholds", () => {
+    expect(conditionTone(100)).toBe("good");
+    expect(conditionTone(70)).toBe("good");
+    expect(conditionTone(69)).toBe("warn");
+    expect(conditionTone(40)).toBe("warn");
+    expect(conditionTone(39)).toBe("bad");
+    expect(conditionTone(0)).toBe("bad");
+    expect(conditionTone(NaN)).toBe("bad");
+  });
+
+  it("conditionPct and ageText never produce NaN", () => {
+    expect(conditionPct(72.6)).toBe(73);
+    expect(conditionPct(-5)).toBe(0);
+    expect(conditionPct(500)).toBe(100);
+    expect(conditionPct(undefined)).toBe(0);
+    expect(ageText(12)).toBe("12 j");
+    for (const bad of [NaN, -1, 1.5, Infinity, undefined, "3"]) {
+      expect(ageText(bad)).toBe("0 j");
+    }
   });
 });
