@@ -64,6 +64,7 @@ describe("initUiState", () => {
       hasRun: false,
       dayBanner: null,
       offline: null,
+      tutorial: "buy", // a brand-new agency starts the tutorial
     });
   });
 

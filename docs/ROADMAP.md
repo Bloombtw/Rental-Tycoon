@@ -65,7 +65,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 2. ✅ **Améliorations à coût croissant** (`upgrades.md`) (courbe exponentielle) : agrandir le parking (remplace le plafond fixe `MAX_FLEET_SIZE`), comptoir plus rapide, publicité (+ demande), station de lavage (+ prix accepté).
 3. ✅ **Clients visibles** dans la vue 3D : petits personnages qui arrivent au comptoir, repartent avec une voiture ou repartent déçus (prix trop élevé).
 4. ✅ **Niveau d'agence / XP** (`agency-level.md`) qui débloque de nouveaux modèles : SUV, utilitaire, électrique, cabriolet, luxe. Le catalogue s'ouvre progressivement.
-5. ⬜ **Tutoriel guidé** (première minute : acheter, tarifer, lancer le temps, lire le bilan), remplace le message d'accueil.
+5. ✅ **Tutoriel guidé** (`tutorial.md`) (première minute : acheter, tarifer, lancer le temps, lire le bilan), remplace le message d'accueil.
 6. ⬜ **Managers / employés** : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
 7. ⬜ **Récompense quotidienne** (série de connexions).
 

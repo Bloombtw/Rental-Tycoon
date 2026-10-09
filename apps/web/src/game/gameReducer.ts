@@ -22,6 +22,7 @@ import {
   levelUpNotice,
 } from "./messages.js";
 import { offlineDays, playOffline, type OfflineReport } from "./offline.js";
+import { initialTutorial, tutorialNext, type TutorialStep } from "./tutorial.js";
 
 export const DEFAULT_SEED = 1;
 
@@ -39,6 +40,8 @@ export interface UiState {
   readonly dayBanner: string | null;
   /** Result of the last absence, shown until the player taps "Récupérer". Already in `game`. */
   readonly offline: OfflineReport | null;
+  /** Guided first minute (tutorial.md); "done" once finished or skipped. */
+  readonly tutorial: TutorialStep;
 }
 
 export type GameAction =
@@ -54,15 +57,18 @@ export type GameAction =
   | { type: "newGame"; seed: number }
   /** The player was away `elapsedMs` (closed app or background): play the offline days. */
   | { type: "returnAfter"; elapsedMs: number }
-  | { type: "claimOffline" };
+  | { type: "claimOffline" }
+  | { type: "tutorialNext" }
+  | { type: "skipTutorial" };
 
 function isSeed(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 2 ** 32;
 }
 
 export function initUiState(game?: GameState): UiState {
+  const g = game ?? createGame(DEFAULT_SEED);
   return {
-    game: game ?? createGame(DEFAULT_SEED),
+    game: g,
     error: null,
     notice: null,
     speed: 1,
@@ -70,7 +76,20 @@ export function initUiState(game?: GameState): UiState {
     hasRun: false,
     dayBanner: null,
     offline: null,
+    tutorial: initialTutorial(g),
   };
+}
+
+/** Moves the tutorial forward from what the action did (tutorial.md). */
+function advanceTutorial(prev: UiState, next: UiState, type: unknown): UiState {
+  let step = next.tutorial;
+  if (type === "skipTutorial") step = "done";
+  else if (type === "tutorialNext") step = tutorialNext(step);
+  else if (step === "buy" && next.game.fleet.length > 0) step = "price";
+  else if (step === "price" && type === "setCarPrice" && next.game !== prev.game) step = "run";
+  else if (step === "run" && !next.paused) step = "wait";
+  else if (step === "wait" && next.game.day > prev.game.day) step = "report";
+  return step === next.tutorial ? next : { ...next, tutorial: step };
 }
 
 /** Plays the offline days of an absence; a second absence before the claim adds up. */
@@ -147,7 +166,10 @@ function advanceTime(state: UiState, minutes: unknown): UiState {
 /** Never throws: any failure while reading a forged action leaves the state untouched. */
 export function gameReducer(state: UiState, action: GameAction): UiState {
   try {
-    return reduce(state, action);
+    const next = reduce(state, action);
+    const type: unknown = (action as { type?: unknown } | null | undefined)?.type;
+    // A new game restarts the tutorial from its own initial step.
+    return type === "newGame" ? next : advanceTutorial(state, next, type);
   } catch {
     return state;
   }

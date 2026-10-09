@@ -11,6 +11,7 @@ import {
 import { UpgradesPanel } from "./components/UpgradesPanel.js";
 import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
 import { BuyCarPanel } from "./components/BuyCarPanel.js";
+import { CoachCard } from "./components/CoachCard.js";
 import { DayBanner } from "./components/DayBanner.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { FleetPanel } from "./components/FleetPanel.js";
@@ -136,6 +137,24 @@ export function App(props: {
     };
   }, [flush]);
 
+  const onTutorialNext = useCallback(() => {
+    dispatch({ type: "tutorialNext" });
+  }, []);
+  const onSkipTutorial = useCallback(() => {
+    dispatch({ type: "skipTutorial" });
+  }, []);
+  // The first two tutorial steps happen in the drawer: open it; the next ones need the city.
+  const tutorialStep = ui.tutorial;
+  // Buy and price happen in the drawer: the coach sits at its top, next to the controls.
+  const coachInDrawer = tutorialStep === "buy" || tutorialStep === "price";
+  // Adjusted while rendering when the step changes (no effect, no cascading render).
+  const [seenStep, setSeenStep] = useState(tutorialStep);
+  if (seenStep !== tutorialStep) {
+    setSeenStep(tutorialStep);
+    if (coachInDrawer) setDrawerOpen(true);
+    else if (tutorialStep === "run") setDrawerOpen(false);
+  }
+
   const onClaimOffline = useCallback(() => {
     dispatch({ type: "claimOffline" });
   }, []);
@@ -180,6 +199,7 @@ export function App(props: {
       ref={appRef}
       className="app"
       data-drawer={drawerOpen ? "open" : "peek"}
+      data-tutorial={ui.tutorial}
       data-quality={quality}
       style={{ "--inset-top": `${String(insets.top)}px` } as CSSProperties}
     >
@@ -200,6 +220,9 @@ export function App(props: {
           onDismiss={autosave.dismissWarning}
         />
         <MessageBanner error={ui.error} notice={ui.notice} onDismiss={onDismissMessage} />
+        {!coachInDrawer && (
+          <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
+        )}
       </div>
       <div className="stage">
         <ErrorBoundary fallback={<AgencyFallback />}>
@@ -223,6 +246,9 @@ export function App(props: {
         capacity={capacity}
         onSetOpen={setDrawerOpen}
       >
+        {coachInDrawer && (
+          <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
+        )}
         <FleetPanel fleet={game.fleet} onSetPrice={onSetPrice} />
         <BuyCarPanel
           cash={game.cash}
