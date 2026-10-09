@@ -2159,52 +2159,6 @@ input {
 }
 
 /* -------------------------------------------------------- shop (shop.md) */
-.shop-fab {
-  position: absolute;
-  right: calc(var(--space-4) + env(safe-area-inset-right));
-  bottom: var(--space-4);
-  z-index: var(--z-fab);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 56px;
-  min-height: 56px;
-  padding: 6px 8px;
-  border: 1px solid var(--c-glass-border);
-  border-radius: var(--radius-lg);
-  background: var(--g-gold);
-  color: var(--c-ink);
-  box-shadow: var(--elev-3), var(--inset-highlight);
-  font: inherit;
-  font-weight: var(--fw-bold);
-  font-size: 12px;
-  cursor: pointer;
-  animation: pop-in var(--dur-base) var(--ease-spring);
-}
-
-.shop-fab:active {
-  transform: translateY(2px);
-}
-
-.shop-fab-gems {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-variant-numeric: tabular-nums;
-}
-
-.shop-fab-boost {
-  position: absolute;
-  top: -8px;
-  left: -8px;
-  padding: 1px 6px;
-  border-radius: var(--radius-pill);
-  background: var(--g-money);
-  color: var(--c-on-dark);
-  box-shadow: var(--elev-2);
-}
-
 .gem-chip {
   display: inline-flex;
   align-items: center;
@@ -2422,11 +2376,6 @@ input {
   animation: pop-in var(--dur-base) var(--ease-spring);
 }
 
-.shop-fab-label {
-  font-size: 11px;
-  line-height: 1;
-}
-
 /* Sound on / off (sounds.md): a small round button on the cash pill's corner (no extra HUD row);
    the hit area is widened to 44 px around it. */
 .cash-pill {
@@ -2462,4 +2411,244 @@ input {
 
 .sound-toggle:active {
   transform: scale(0.94);
+}
+
+/* -------------------------------------------------------- side rail (side-menu.md) */
+/* Mobile-game column of round icon buttons on the right edge, over the city. */
+.side-rail {
+  position: absolute;
+  right: calc(var(--space-2) + env(safe-area-inset-right));
+  z-index: var(--z-fab);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.rail-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-on-dark);
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rail-circle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 0.85);
+  background: var(--g-primary);
+  color: var(--c-on-dark);
+  box-shadow: var(--lip-primary), var(--elev-2), var(--inset-highlight);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.rail-btn[data-kind="shop"] .rail-circle {
+  background: var(--g-gold);
+  color: var(--c-ink);
+  box-shadow:
+    0 4px 0 var(--c-gold-700),
+    var(--elev-2),
+    var(--inset-highlight);
+}
+
+.rail-btn[data-active="true"] .rail-circle {
+  background: var(--g-money);
+  box-shadow: var(--lip-money), var(--elev-2), var(--inset-highlight);
+}
+
+.rail-btn:active .rail-circle {
+  transform: translateY(3px) scale(0.96);
+}
+
+.rail-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: var(--fw-heavy);
+  line-height: 1.1;
+  text-shadow:
+    0 1px 2px rgb(0 0 0 / 0.75),
+    0 0 6px rgb(0 0 0 / 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--c-on-dark);
+  background: var(--c-danger);
+  color: var(--c-on-dark);
+  font-size: 11px;
+  font-weight: var(--fw-heavy);
+  animation: pop-in var(--dur-base) var(--ease-spring);
+}
+
+.rail-badge[data-kind="boost"] {
+  background: var(--g-money);
+}
+
+/* Menus opened from the rail: a sheet rising from the bottom. */
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--c-scrim);
+  animation: fade-in var(--dur-base) var(--ease-out);
+}
+
+.panel-backdrop[hidden] {
+  display: none;
+}
+
+.panel-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 520px);
+  max-height: 84dvh;
+  padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--c-sand);
+  color: var(--c-ink);
+  box-shadow: var(--elev-3);
+  animation: sheet-in var(--dur-slow) var(--ease-out);
+}
+
+.panel-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+}
+
+.panel-sheet-head .rail-circle {
+  width: 44px;
+  height: 44px;
+}
+
+.panel-sheet-head h2 {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.panel-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Settings (sounds.md) */
+.setting-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--c-surface-2);
+  color: var(--c-ink);
+  font: inherit;
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+}
+
+.setting-switch-label {
+  flex: 1;
+  text-align: left;
+}
+
+.setting-switch-track {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--c-neutral-500);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.setting-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--c-on-dark);
+  box-shadow: var(--elev-2);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.setting-switch[aria-checked="true"] .setting-switch-track {
+  background: var(--c-money-500);
+}
+
+.setting-switch[aria-checked="true"] .setting-switch-thumb {
+  transform: translateX(20px);
+}
+
+.setting-slider {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.setting-slider[data-disabled="true"] {
+  opacity: 0.5;
+}
+
+.setting-slider label {
+  display: flex;
+  justify-content: space-between;
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-sm);
+}
+
+.setting-value {
+  color: var(--c-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.setting-slider input[type="range"] {
+  width: 100%;
+  height: var(--tap);
+  margin: 0;
+  accent-color: var(--c-primary-500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-backdrop,
+  .panel-sheet,
+  .rail-badge {
+    animation: none;
+  }
 }

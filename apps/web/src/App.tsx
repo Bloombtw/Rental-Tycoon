@@ -16,6 +16,9 @@ import {
   type UpgradeId,
 } from "@rt/sim";
 import { ManagersPanel } from "./components/ManagersPanel.js";
+import { PanelSheet } from "./components/PanelSheet.js";
+import { SettingsPanel } from "./components/SettingsPanel.js";
+import { SideRail, type PanelId } from "./components/SideRail.js";
 import { MissionsPanel } from "./components/MissionsPanel.js";
 import { UpgradesPanel } from "./components/UpgradesPanel.js";
 import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
@@ -24,7 +27,6 @@ import { CoachCard } from "./components/CoachCard.js";
 import { DailyRewardDialog } from "./components/DailyRewardDialog.js";
 import { DemoCheckout } from "./components/DemoCheckout.js";
 import { ShopDialog } from "./components/ShopDialog.js";
-import { gemsText } from "./game/messages.js";
 import {
   fetchLiveReceipt,
   paymentsConfig,
@@ -32,7 +34,6 @@ import {
   startLiveCheckout,
   testReceipt,
 } from "./game/payments.js";
-import { Icon } from "./ui/icons.js";
 import { calendarDay } from "./game/calendar.js";
 import { useGameAudio } from "./game/useGameAudio.js";
 import { DayBanner } from "./components/DayBanner.js";
@@ -42,7 +43,6 @@ import { Hud } from "./components/Hud.js";
 import { ManageDrawer } from "./components/ManageDrawer.js";
 import { MessageBanner } from "./components/MessageBanner.js";
 import type { Speed } from "./game/clock.js";
-import { NewGameButton } from "./components/NewGameButton.js";
 import { NewGameDialog } from "./components/NewGameDialog.js";
 import { OfflineDialog } from "./components/OfflineDialog.js";
 import { SaveWarning } from "./components/SaveWarning.js";
@@ -80,7 +80,8 @@ export function App(props: {
     }),
   );
   const [ui, dispatch] = useReducer(gameReducer, loaded.ui);
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  // The fleet drawer starts collapsed: the city and the side menus come first.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Quality tier of the scene: it decides how much of the glass is blurred (see app.css).
   const [quality, setQuality] = useState<QualityTier>(() => initialTier(deviceHints()));
@@ -172,16 +173,29 @@ export function App(props: {
   const onSkipTutorial = useCallback(() => {
     dispatch({ type: "skipTutorial" });
   }, []);
-  // The first two tutorial steps happen in the drawer: open it; the next ones need the city.
+  // Tutorial (tutorial.md): buying happens in the "Voitures" menu, pricing in the fleet drawer;
+  // the coach card sits next to those controls, under the HUD for the later steps.
   const tutorialStep = ui.tutorial;
-  // Buy and price happen in the drawer: the coach sits at its top, next to the controls.
-  const coachInDrawer = tutorialStep === "buy" || tutorialStep === "price";
+  const coachInMenu = tutorialStep === "buy" || tutorialStep === "price";
+  // Side menus (side-menu.md). A brand-new agency opens on "Voitures" for its first purchase.
+  const [panel, setPanel] = useState<PanelId | null>(() =>
+    tutorialStep === "buy" ? "cars" : null,
+  );
+  const onOpenPanel = useCallback((id: PanelId) => {
+    setPanel((p) => (p === id ? null : id));
+  }, []);
+  const onClosePanel = useCallback(() => {
+    setPanel(null);
+  }, []);
   // Adjusted while rendering when the step changes (no effect, no cascading render).
   const [seenStep, setSeenStep] = useState(tutorialStep);
   if (seenStep !== tutorialStep) {
     setSeenStep(tutorialStep);
-    if (coachInDrawer) setDrawerOpen(true);
-    else if (tutorialStep === "run") setDrawerOpen(false);
+    if (tutorialStep === "buy") setPanel("cars");
+    else if (tutorialStep === "price") {
+      setPanel(null);
+      setDrawerOpen(true);
+    } else if (tutorialStep === "run") setDrawerOpen(false);
   }
 
   const onClaimMission = useCallback((slot: number) => {
@@ -356,7 +370,7 @@ export function App(props: {
           onDismiss={autosave.dismissWarning}
         />
         <MessageBanner error={ui.error} notice={ui.notice} onDismiss={onDismissMessage} />
-        {!coachInDrawer && (
+        {!coachInMenu && (
           <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
         )}
       </div>
@@ -380,14 +394,41 @@ export function App(props: {
         open={drawerOpen}
         fleetSize={game.fleet.length}
         capacity={capacity}
-        badge={claimableMissions(game)}
         onSetOpen={setDrawerOpen}
       >
-        {coachInDrawer && (
+        {tutorialStep === "price" && (
           <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
         )}
-        {ui.tutorial === "done" && <MissionsPanel game={game} onClaim={onClaimMission} />}
         <FleetPanel fleet={game.fleet} onSetPrice={onSetPrice} />
+      </ManageDrawer>
+      <SideRail
+        active={panel}
+        missionsBadge={claimableMissions(game)}
+        gems={game.shop.gems}
+        boosted={revenueMultiplier(game) > 1}
+        onOpen={onOpenPanel}
+        onOpenShop={onOpenShop}
+        top={insets.top}
+      />
+      <PanelSheet
+        open={panel === "missions"}
+        title="Missions"
+        icon="check-circle"
+        testId="panel-missions"
+        onClose={onClosePanel}
+      >
+        <MissionsPanel game={game} onClaim={onClaimMission} />
+      </PanelSheet>
+      <PanelSheet
+        open={panel === "cars"}
+        title="Voitures"
+        icon="car"
+        testId="panel-cars"
+        onClose={onClosePanel}
+      >
+        {tutorialStep === "buy" && (
+          <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
+        )}
         <BuyCarPanel
           cash={game.cash}
           fleetSize={game.fleet.length}
@@ -396,7 +437,23 @@ export function App(props: {
           highlight={game.fleet.length === 0}
           onBuy={onBuy}
         />
+      </PanelSheet>
+      <PanelSheet
+        open={panel === "upgrades"}
+        title="Améliorations"
+        icon="wrench"
+        testId="panel-upgrades"
+        onClose={onClosePanel}
+      >
         <UpgradesPanel cash={game.cash} upgrades={game.upgrades} onBuy={onBuyUpgrade} />
+      </PanelSheet>
+      <PanelSheet
+        open={panel === "staff"}
+        title="Employés"
+        icon="key"
+        testId="panel-staff"
+        onClose={onClosePanel}
+      >
         <ManagersPanel
           cash={game.cash}
           xp={game.xp}
@@ -404,30 +461,28 @@ export function App(props: {
           onHire={onHireManager}
           onFire={onFireManager}
         />
-        <NewGameButton onClick={onAskNewGame} />
-      </ManageDrawer>
+      </PanelSheet>
+      <PanelSheet
+        open={panel === "settings"}
+        title="Réglages"
+        icon="settings"
+        testId="panel-settings"
+        onClose={onClosePanel}
+      >
+        <SettingsPanel
+          muted={sound.muted}
+          volumes={sound.volumes}
+          onToggleMute={sound.toggleMute}
+          onVolume={sound.setVolume}
+          onNewGame={onAskNewGame}
+        />
+      </PanelSheet>
       {confirmOpen && (
         <NewGameDialog game={game} onCancel={onCancelNewGame} onConfirm={onConfirmNewGame} />
       )}
       {ui.offline !== null && !confirmOpen && (
         <OfflineDialog report={ui.offline} onClaim={onClaimOffline} />
       )}
-      <button
-        type="button"
-        className="shop-fab"
-        data-testid="shop-open"
-        style={{ bottom: `calc(${String(insets.bottom)}px + var(--space-4))` }}
-        aria-label={`Boutique, ${gemsText(game.shop.gems)}`}
-        onClick={onOpenShop}
-      >
-        <Icon name="shop" size={24} />
-        <span className="shop-fab-label">Boutique</span>
-        <span className="shop-fab-gems">
-          <Icon name="gem" size={16} />
-          {game.shop.gems}
-        </span>
-        {revenueMultiplier(game) > 1 && <span className="shop-fab-boost">×2</span>}
-      </button>
       {shopOpen && checkout === null && (
         <ShopDialog
           game={game}

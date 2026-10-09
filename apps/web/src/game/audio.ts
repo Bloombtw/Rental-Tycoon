@@ -21,6 +21,44 @@ export const CASH_VOLUME = 0.6;
 /** At x10 many rentals land in the same frame: at most one cash sound per this gap. */
 export const CASH_MIN_GAP_MS = 120;
 export const MUTED_KEY = "rental-tycoon/muted";
+export const VOLUMES_KEY = "rental-tycoon/volumes";
+
+/** Player volume settings, each 0..1, applied on top of the base volumes. */
+export interface AudioVolumes {
+  readonly music: number;
+  readonly ambience: number;
+  readonly effects: number;
+}
+
+export const DEFAULT_VOLUMES: AudioVolumes = Object.freeze({ music: 1, ambience: 1, effects: 1 });
+
+function unit(v: unknown, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback;
+}
+
+/** Saved volumes, or the defaults. Never throws. */
+export function readVolumes(storage: MiniStorage | null): AudioVolumes {
+  try {
+    const raw = storage?.getItem(VOLUMES_KEY);
+    if (!raw) return DEFAULT_VOLUMES;
+    const v = JSON.parse(raw) as Partial<Record<keyof AudioVolumes, unknown>> | null;
+    return {
+      music: unit(v?.music, 1),
+      ambience: unit(v?.ambience, 1),
+      effects: unit(v?.effects, 1),
+    };
+  } catch {
+    return DEFAULT_VOLUMES;
+  }
+}
+
+export function writeVolumes(storage: MiniStorage | null, volumes: AudioVolumes): void {
+  try {
+    storage?.setItem(VOLUMES_KEY, JSON.stringify(volumes));
+  } catch {
+    // the settings last for this session only
+  }
+}
 
 /** True if a cash sound may play at `now` after one at `last` (null: never played). */
 export function cashAllowed(last: number | null, now: number): boolean {
@@ -28,7 +66,7 @@ export function cashAllowed(last: number | null, now: number): boolean {
   return last === null || !Number.isFinite(last) || now - last >= CASH_MIN_GAP_MS || now < last;
 }
 
-interface MiniStorage {
+export interface MiniStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
@@ -63,6 +101,9 @@ function audioContextCtor(): AudioContextCtor | null {
 
 interface Loop {
   readonly element: HTMLAudioElement;
+  readonly gain: GainNode;
+  readonly base: number;
+  readonly kind: "music" | "ambience";
 }
 
 export class GameAudio {
@@ -74,10 +115,26 @@ export class GameAudio {
   private unlocked = false;
   private hidden = false;
 
+  private volumes: AudioVolumes = DEFAULT_VOLUMES;
+
   constructor(
     private readonly baseUrl: string,
     private muted: boolean,
   ) {}
+
+  /** Player volumes (settings). Loops update at once; the next cash sound uses the new level. */
+  setVolumes(volumes: AudioVolumes): void {
+    this.volumes = {
+      music: unit(volumes.music, 1),
+      ambience: unit(volumes.ambience, 1),
+      effects: unit(volumes.effects, 1),
+    };
+    const ctx = this.ctx;
+    if (!ctx) return;
+    for (const loop of this.loops) {
+      loop.gain.gain.setValueAtTime(loop.base * this.volumes[loop.kind], ctx.currentTime);
+    }
+  }
 
   isMuted(): boolean {
     return this.muted;
@@ -98,8 +155,8 @@ export class GameAudio {
       this.unlocked = true;
       void ctx.resume().catch(() => undefined);
       this.loops = [
-        this.makeLoop(AUDIO_FILES.music, MUSIC_VOLUME),
-        this.makeLoop(AUDIO_FILES.ambience, AMBIENCE_VOLUME),
+        this.makeLoop(AUDIO_FILES.music, MUSIC_VOLUME, "music"),
+        this.makeLoop(AUDIO_FILES.ambience, AMBIENCE_VOLUME, "ambience"),
       ].filter((l): l is Loop => l !== null);
       this.syncLoops();
       void this.loadCash();
@@ -112,7 +169,7 @@ export class GameAudio {
     return `${this.baseUrl}${path}`;
   }
 
-  private makeLoop(path: string, volume: number): Loop | null {
+  private makeLoop(path: string, volume: number, kind: Loop["kind"]): Loop | null {
     const { ctx, master } = this;
     if (!ctx || !master) return null;
     try {
@@ -120,10 +177,10 @@ export class GameAudio {
       element.loop = true;
       element.preload = "auto";
       const gain = ctx.createGain();
-      gain.gain.value = volume;
+      gain.gain.value = volume * this.volumes[kind];
       ctx.createMediaElementSource(element).connect(gain);
       gain.connect(master);
-      return { element };
+      return { element, gain, base: volume, kind };
     } catch {
       return null;
     }
@@ -179,7 +236,7 @@ export class GameAudio {
       const source = ctx.createBufferSource();
       source.buffer = cashBuffer;
       const gain = ctx.createGain();
-      gain.gain.value = CASH_VOLUME;
+      gain.gain.value = CASH_VOLUME * this.volumes.effects;
       source.connect(gain);
       gain.connect(master);
       source.start();

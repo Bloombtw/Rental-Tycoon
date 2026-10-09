@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameState } from "@rt/sim";
 import { departuresBetween } from "../scene/gains.js";
-import { GameAudio, readMuted, writeMuted } from "./audio.js";
+import {
+  GameAudio,
+  readMuted,
+  readVolumes,
+  writeMuted,
+  writeVolumes,
+  type AudioVolumes,
+} from "./audio.js";
 import type { SaveStorage } from "./saveStorage.js";
 
 /** Gestures that count as user activation on iOS (any of them unlocks audio). */
@@ -14,13 +21,21 @@ const UNLOCK_EVENTS = ["pointerdown", "touchend", "click", "keydown"] as const;
 export function useGameAudio(
   game: GameState,
   storage: SaveStorage | null,
-): { readonly muted: boolean; readonly toggleMute: () => void } {
+): {
+  readonly muted: boolean;
+  readonly toggleMute: () => void;
+  readonly volumes: AudioVolumes;
+  readonly setVolume: (kind: keyof AudioVolumes, value: number) => void;
+} {
   const [muted, setMuted] = useState(() => readMuted(storage));
+  const [volumes, setVolumes] = useState(() => readVolumes(storage));
+  const volumesRef = useRef(volumes);
   const audioRef = useRef<GameAudio | null>(null);
   const mutedRef = useRef(muted);
 
   useEffect(() => {
     const audio = new GameAudio(import.meta.env.BASE_URL, mutedRef.current);
+    audio.setVolumes(volumesRef.current);
     audioRef.current = audio;
     const unlock = (): void => {
       audio.unlock();
@@ -44,6 +59,11 @@ export function useGameAudio(
     audioRef.current?.setMuted(muted);
   }, [muted]);
 
+  useEffect(() => {
+    volumesRef.current = volumes;
+    audioRef.current?.setVolumes(volumes);
+  }, [volumes]);
+
   // A cash sound for the cars that just left on a rental (live play only, like the "+X €").
   const prevGame = useRef(game);
   useEffect(() => {
@@ -61,5 +81,16 @@ export function useGameAudio(
     });
   }, [storage]);
 
-  return { muted, toggleMute };
+  const setVolume = useCallback(
+    (kind: keyof AudioVolumes, value: number) => {
+      setVolumes((v) => {
+        const next = { ...v, [kind]: Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1)) };
+        writeVolumes(storage, next);
+        return next;
+      });
+    },
+    [storage],
+  );
+
+  return { muted, toggleMute, volumes, setVolume };
 }

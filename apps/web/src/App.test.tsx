@@ -204,7 +204,8 @@ describe("App: launch", () => {
     expect(byId("speed-pause").getAttribute("aria-pressed")).toBe("true");
     expect(byId("speed-pause").getAttribute("data-highlight")).toBe("true");
     expect(byId("speed-1").getAttribute("aria-pressed")).toBe("true");
-    expect(byId("drawer-toggle").getAttribute("aria-expanded")).toBe("true");
+    // The fleet drawer starts collapsed (side-menu.md).
+    expect(byId("drawer-toggle").getAttribute("aria-expanded")).toBe("false");
     expect(maybeId("agency-fallback")).not.toBeNull();
     expect(cashText()).toBe(norm(formatCents(50_000_00)));
     expect(cashText()).toBe("50 000,00 €");
@@ -734,10 +735,12 @@ describe("App: hidden page and unmount", () => {
 });
 
 describe("App: drawer and view", () => {
-  it("opens at launch; the handle collapses and expands it and hides the content", () => {
+  it("starts collapsed; the handle expands and collapses it and hides the content", () => {
     mountApp();
     const toggle = byId("drawer-toggle");
     const content = container.querySelector<HTMLElement>("#drawer-content");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(content?.hidden).toBe(false);
     click(toggle);
@@ -767,6 +770,7 @@ describe("App: drawer and view", () => {
   it("dragging the handle down by more than 40 px collapses; 30 px does nothing", () => {
     mountApp();
     const toggle = byId("drawer-toggle");
+    click(toggle); // starts collapsed: open it first
     pointer(toggle, "pointerdown", 100);
     pointer(toggle, "pointerup", 130);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");

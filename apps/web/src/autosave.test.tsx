@@ -181,6 +181,9 @@ describe("dialog focus", () => {
   }
   it("traps Tab inside the dialog and restores focus to the opener", () => {
     mount(memoryStorage());
+    act(() => {
+      byId("rail-settings").click(); // "Nouvelle partie" lives in the settings menu
+    });
     const opener = byId("new-game");
     act(() => {
       opener.focus();
