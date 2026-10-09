@@ -67,7 +67,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 4. ✅ **Niveau d'agence / XP** (`agency-level.md`) qui débloque de nouveaux modèles : SUV, utilitaire, électrique, cabriolet, luxe. Le catalogue s'ouvre progressivement.
 5. ✅ **Tutoriel guidé** (`tutorial.md`) (première minute : acheter, tarifer, lancer le temps, lire le bilan), remplace le message d'accueil.
 6. ✅ **Managers / employés** (`managers.md`) : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
-7. ⬜ **Récompense quotidienne** (série de connexions).
+7. ✅ **Récompense quotidienne** (`daily-reward.md`) (série de connexions).
 
 ## Plus tard (si le temps le permet)
 

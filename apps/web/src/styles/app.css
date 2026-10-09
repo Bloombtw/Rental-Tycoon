@@ -1750,6 +1750,50 @@ input {
   margin-bottom: var(--space-1);
 }
 
+/* Daily reward: the 7-day streak strip (daily-reward.md). */
+.daily-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.daily-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  border-radius: var(--radius);
+  background: var(--c-surface-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-day-n {
+  font-weight: var(--fw-bold);
+  color: var(--c-ink-muted);
+}
+
+.daily-day-amount {
+  font-weight: var(--fw-bold);
+  white-space: nowrap;
+}
+
+.daily-day[data-state="past"] {
+  opacity: 0.5;
+}
+
+.daily-day[data-state="today"] {
+  background: var(--g-gold);
+  color: var(--c-ink);
+  box-shadow: var(--elev-2);
+  transform: scale(1.08);
+}
+
 .offline-badge[data-gain="true"] {
   background: var(--g-money);
   box-shadow: var(--lip-money), var(--inset-highlight);

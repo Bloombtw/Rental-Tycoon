@@ -150,6 +150,7 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     upgrades: state.upgrades,
     xp,
     managers: state.managers,
+    dailyReward: state.dailyReward,
     fleet: copy ?? state.fleet,
     lastDay,
   };

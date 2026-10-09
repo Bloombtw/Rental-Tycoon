@@ -17,6 +17,7 @@ import {
   type RentalOutcome,
 } from "./state.js";
 import { DAY_MINUTES } from "./time.js";
+import { NO_DAILY_REWARD, type DailyRewardState } from "./dailyReward.js";
 import {
   MANAGER_IDS,
   NO_MANAGERS,
@@ -36,7 +37,7 @@ import {
 } from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 5;
+export const GAME_STATE_VERSION = 6;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -192,6 +193,7 @@ function parse(raw: unknown): GameState {
   }
   const xp = int(own(raw, "xp"), "xp", 0, Number.MAX_SAFE_INTEGER);
   const managers = parseManagers(own(raw, "managers"));
+  const dailyReward = parseDailyReward(own(raw, "dailyReward"));
 
   return {
     seed,
@@ -204,12 +206,28 @@ function parse(raw: unknown): GameState {
     upgrades,
     xp,
     managers,
+    dailyReward,
     fleet,
     lastDay,
   };
 }
 
 /** v3 → v4: adds `xp` (a fresh agency: level 1, the first three models stay buyable). */
+/** v5 → v6: adds `dailyReward` (never claimed). */
+function migrateV5(raw: unknown): unknown {
+  return isRecord(raw) ? { ...raw, dailyReward: { ...NO_DAILY_REWARD } } : raw;
+}
+
+function parseDailyReward(raw: unknown): DailyRewardState {
+  if (!isRecord(raw)) throw new InvalidGameStateError("dailyReward", "type");
+  const lastDay = int(own(raw, "lastDay"), "dailyReward.lastDay", -1, Number.MAX_SAFE_INTEGER);
+  const streak = int(own(raw, "streak"), "dailyReward.streak", 0, Number.MAX_SAFE_INTEGER);
+  if ((lastDay === -1) !== (streak === 0)) {
+    throw new InvalidGameStateError("dailyReward", "inconsistent");
+  }
+  return { lastDay, streak };
+}
+
 /** v4 → v5: adds `managers` (nobody hired). */
 function migrateV4(raw: unknown): unknown {
   return isRecord(raw) ? { ...raw, managers: { ...NO_MANAGERS } } : raw;
@@ -277,6 +295,7 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
     if (stateVersion < 3) data = migrateV2(data);
     if (stateVersion < 4) data = migrateV3(data);
     if (stateVersion < 5) data = migrateV4(data);
+    if (stateVersion < 6) data = migrateV5(data);
   } catch {
     throw new InvalidGameStateError("$", "type");
   }

@@ -18,7 +18,8 @@ export type SimErrorCode =
   | "UPGRADE_MAXED"
   | "MODEL_LOCKED"
   | "UNKNOWN_MANAGER"
-  | "MANAGER_STATE";
+  | "MANAGER_STATE"
+  | "REWARD_ALREADY_CLAIMED";
 
 /** Base class of every typed sim error. Extends RangeError for compatibility. */
 export abstract class SimError extends RangeError {
@@ -168,6 +169,17 @@ export class ManagerStateError extends SimError {
     this.name = "ManagerStateError";
     this.manager = manager;
     this.alreadyHired = alreadyHired;
+  }
+}
+
+export class RewardAlreadyClaimedError extends SimError {
+  readonly code = "REWARD_ALREADY_CLAIMED" as const;
+  readonly day: unknown;
+
+  constructor(day: unknown) {
+    super("daily reward already claimed or invalid day");
+    this.name = "RewardAlreadyClaimedError";
+    this.day = day;
   }
 }
 

@@ -3,6 +3,7 @@ import {
   advanceMinutes,
   buyCar,
   buyUpgrade,
+  claimDailyReward,
   createGame,
   fireManager,
   hireManager,
@@ -54,6 +55,7 @@ export type GameAction =
   | { type: "buyUpgrade"; upgrade: UpgradeId }
   | { type: "hireManager"; manager: ManagerId }
   | { type: "fireManager"; manager: ManagerId }
+  | { type: "claimDailyReward"; today: number }
   | { type: "advanceTime"; minutes: number }
   | { type: "setSpeed"; speed: Speed }
   | { type: "togglePause" }
@@ -135,6 +137,13 @@ function applyAction(game: GameState, action: GameAction): { game: GameState; no
       return {
         game: next,
         notice: `Prix de la voiture n°${action.carId} fixé à ${formatCents(applied?.dailyPrice ?? 0)}/jour.`,
+      };
+    }
+    case "claimDailyReward": {
+      const next = claimDailyReward(game, action.today);
+      return {
+        game: next,
+        notice: `Prime du jour encaissée : +${formatCents(next.cash - game.cash)}.`,
       };
     }
     case "hireManager":
@@ -223,6 +232,7 @@ function reduce(state: UiState, action: GameAction): UiState {
     case "buyUpgrade":
     case "hireManager":
     case "fireManager":
+    case "claimDailyReward":
       try {
         const result = applyAction(state.game, action);
         return { ...state, game: result.game, error: null, notice: result.notice };

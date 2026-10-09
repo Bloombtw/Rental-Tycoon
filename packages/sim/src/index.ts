@@ -1,4 +1,5 @@
 export * from "./actions.js";
+export * from "./dailyReward.js";
 export * from "./economy.js";
 export * from "./errors.js";
 export * from "./rng.js";

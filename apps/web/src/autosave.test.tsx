@@ -63,7 +63,15 @@ afterEach(() => {
 
 function mount(storage: SaveStorage | null, extra: { initialGame?: GameState } = {}): void {
   act(() => {
-    root.render(<App clockDriver={driver} storage={storage} newSeed={() => 99} {...extra} />);
+    root.render(
+      <App
+        dailyReward={false}
+        clockDriver={driver}
+        storage={storage}
+        newSeed={() => 99}
+        {...extra}
+      />,
+    );
   });
 }
 function byId(id: string): HTMLElement {

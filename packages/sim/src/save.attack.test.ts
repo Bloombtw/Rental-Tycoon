@@ -53,7 +53,7 @@ describe("save attacks", () => {
     fleet[0] = { ...fleet[0], model: "__proto__" };
     expect(() => validateGameState(s)).toThrow(InvalidGameStateError);
     const extra = JSON.parse(
-      '{"__proto__":{"polluted":1},"seed":1,"rngState":1,"day":0,"minute":0,"cash":1,"todayRevenue":0,"customersLeft":0,"upgrades":{"parking":0,"counter":0,"ads":0,"wash":0},"xp":0,"managers":{"sales":false,"pricing":false},"fleet":[],"lastDay":null}',
+      '{"__proto__":{"polluted":1},"seed":1,"rngState":1,"day":0,"minute":0,"cash":1,"todayRevenue":0,"customersLeft":0,"upgrades":{"parking":0,"counter":0,"ads":0,"wash":0},"xp":0,"managers":{"sales":false,"pricing":false},"dailyReward":{"lastDay":-1,"streak":0},"fleet":[],"lastDay":null}',
     ) as unknown;
     const out = validateGameState(extra) as unknown as Record<string, unknown>;
     expect(out["polluted"]).toBeUndefined();

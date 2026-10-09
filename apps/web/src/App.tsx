@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import {
+  canClaimDailyReward,
   fleetCapacity,
+  nextStreak,
   type CarId,
   type CarModelId,
   type Cents,
@@ -14,6 +16,8 @@ import { UpgradesPanel } from "./components/UpgradesPanel.js";
 import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
 import { BuyCarPanel } from "./components/BuyCarPanel.js";
 import { CoachCard } from "./components/CoachCard.js";
+import { DailyRewardDialog } from "./components/DailyRewardDialog.js";
+import { calendarDay } from "./game/calendar.js";
 import { DayBanner } from "./components/DayBanner.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { FleetPanel } from "./components/FleetPanel.js";
@@ -40,6 +44,8 @@ export function App(props: {
   clockDriver?: ClockDriver;
   storage?: SaveStorage | null;
   newSeed?: () => number;
+  /** Offer the daily login reward (tests turn it off). Defaults to true. */
+  dailyReward?: boolean;
 }) {
   // Storage and the saved game are read once, synchronously, before the first render.
   const [storage] = useState<SaveStorage | null>(() =>
@@ -114,6 +120,8 @@ export function App(props: {
     onCommit,
   });
 
+  // Local calendar day, refreshed on return from background (daily-reward.md).
+  const [today, setToday] = useState(() => calendarDay(Date.now()));
   // Hidden page -> pause, and stay paused on return. The time away earns offline days.
   useEffect(() => {
     let hiddenAt: number | null = null;
@@ -129,6 +137,7 @@ export function App(props: {
         const elapsedMs = Date.now() - hiddenAt;
         hiddenAt = null;
         dispatch({ type: "returnAfter", elapsedMs });
+        setToday(calendarDay(Date.now()));
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
@@ -160,6 +169,17 @@ export function App(props: {
   const onClaimOffline = useCallback(() => {
     dispatch({ type: "claimOffline" });
   }, []);
+
+  // Daily login reward (daily-reward.md): once the tutorial and any offline report are done.
+  const onClaimDailyReward = useCallback(() => {
+    dispatch({ type: "claimDailyReward", today });
+  }, [today]);
+  const showDailyReward =
+    props.dailyReward !== false &&
+    ui.tutorial === "done" &&
+    ui.offline === null &&
+    !confirmOpen &&
+    canClaimDailyReward(game, today);
 
   const makeSeed = props.newSeed ?? newSeed;
   const onAskNewGame = useCallback(() => {
@@ -281,6 +301,12 @@ export function App(props: {
       )}
       {ui.offline !== null && !confirmOpen && (
         <OfflineDialog report={ui.offline} onClaim={onClaimOffline} />
+      )}
+      {showDailyReward && (
+        <DailyRewardDialog
+          streak={nextStreak(game.dailyReward, today)}
+          onClaim={onClaimDailyReward}
+        />
       )}
     </main>
   );

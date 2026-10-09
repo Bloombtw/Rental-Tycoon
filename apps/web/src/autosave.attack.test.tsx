@@ -54,7 +54,9 @@ afterEach(() => {
 });
 function mount(storage: SaveStorage | null): void {
   act(() => {
-    root.render(<App clockDriver={driver} storage={storage} newSeed={() => 99} />);
+    root.render(
+      <App dailyReward={false} clockDriver={driver} storage={storage} newSeed={() => 99} />,
+    );
   });
 }
 function click(id: string): void {
