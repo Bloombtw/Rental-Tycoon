@@ -17,6 +17,7 @@ Les questions qui demandent une décision humaine. Le travail ne bloque pas dess
 
 1. **Ajouter un kit de personnages (Kenney, CC0) pour les piétons et les clients.** Aucun kit actuel n'a de personnages, et une gélule sans membres serait refusée comme « programmer art ». Les agents ne peuvent pas télécharger d'assets.
    _Recommandation_ : qu'un humain ajoute un kit de personnages Kenney (par ex. « Mini Characters ») dans `apps/web/public/assets/characters/`, avec son `LICENSE.txt`, avant la Phase 2, point 5. En attendant, les piétons d'ambiance sont reportés.
+   _Décision du propriétaire (2026-10-09)_ : il ajoute lui-même le kit de personnages ; **ne jamais créer de personnages low poly procéduraux**. Le point « Clients visibles » attend le kit ; la logique pure des trajets (`scene/customers.ts`, branche `feat/visible-customers`) est prête à brancher.
 
 2. **Vitesse de nos voitures et de la circulation.** Nos voitures roulent sur le temps de jeu (un trajet de 60 minutes de jeu dure 2,4 s à x1). La circulation de fond roule sur un « temps d'ambiance » adouci (×1 à ×3). Les nôtres vont donc nettement plus vite que les taxis.
    _Recommandation_ : garder ce choix (nos voitures « foncent » vers leurs clients et l'écran reste lisible à x10), et le revoir sur iPhone après les captures.
