@@ -727,6 +727,107 @@ input {
   height: 120px;
 }
 
+/* -------------------------------------------------------- gain feedback */
+/* "+X €" rises over the car that leaves on a rental while a coin flies to the HUD cash. Above the
+   HUD so the coin lands on the counter. Transform and opacity only. */
+.gain-layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.gain-float {
+  position: absolute;
+  width: 0;
+  height: 0;
+  animation: gain-life 1400ms linear forwards;
+}
+
+.gain-text {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  transform: translate(-50%, 0);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--g-money-dark);
+  color: var(--c-money-on-dark);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow: var(--ts-on-dark);
+  box-shadow: var(--elev-2);
+  animation: gain-rise 1100ms var(--ease-out) forwards;
+}
+
+.gain-coin {
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  display: grid;
+  opacity: 0;
+  animation: gain-coin 1000ms var(--ease-in-out) 350ms forwards;
+}
+
+@keyframes gain-life {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gain-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.7);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -6px) scale(1.08);
+  }
+  30% {
+    transform: translate(-50%, -10px) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -44px) scale(1);
+  }
+}
+
+@keyframes gain-coin {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(0, -16px) scale(1.15);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--coin-dx), var(--coin-dy)) scale(0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gain-text {
+    animation: fade-in var(--dur-base) var(--ease-out);
+  }
+
+  .gain-coin {
+    display: none;
+  }
+}
+
 /* -------------------------------------------------------- recenter / tooltip */
 .camera-reset {
   position: absolute;
