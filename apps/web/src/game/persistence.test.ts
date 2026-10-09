@@ -101,7 +101,7 @@ describe("loadInitialState", () => {
   it("starts a new game when there is no save", () => {
     const r = loadInitialState({ storage: memoryStorage(), newSeed: seed });
     expect(r.status).toBe("ok");
-    expect(r.ui.game).toEqual(createGame(4242));
+    expect(r.ui.game).toEqual(createGame(4242, 0)); // empty till: René brings the money
     expect(r.ui.paused).toBe(true);
     expect(r.ui.notice).toBeNull();
   });
@@ -120,7 +120,7 @@ describe("loadInitialState", () => {
     const r = loadInitialState({ storage, newSeed: seed });
     expect(storage.data.get(REJECTED_SAVE_KEY)).toBe("{broken");
     expect(r.ui.error).toBe("Sauvegarde illisible : une nouvelle partie a commencé.");
-    expect(r.ui.game).toEqual(createGame(4242));
+    expect(r.ui.game).toEqual(createGame(4242, 0)); // empty till: René brings the money
   });
   it("explains a newer save", () => {
     const env = JSON.parse(encodeSave(played, 1, 5)) as Record<string, unknown>;
@@ -135,7 +135,7 @@ describe("loadInitialState", () => {
     expect(loadInitialState({ storage: null, newSeed: seed }).status).toBe("unavailable");
     const r = loadInitialState({ storage: throwingStorage(), newSeed: seed });
     expect(r.status).toBe("unavailable");
-    expect(r.ui.game).toEqual(createGame(4242));
+    expect(r.ui.game).toEqual(createGame(4242, 0)); // empty till: René brings the money
   });
   it("initialGame short-circuits the read", () => {
     const storage = memoryStorage({ [SAVE_KEY]: encodeSave(played, 1, 1) });

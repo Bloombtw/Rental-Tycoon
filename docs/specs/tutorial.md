@@ -122,3 +122,14 @@ interface TutorialOverlayProps {
 // AgencyScene3D: setRene(mode: "hidden" | "idle" | "cheer" | "leave"); AgencyView prop
 // onDepartingCar?: (p: { x: number; y: number } | null) => void (screen position of a car leaving).
 ```
+
+## Argent (révision 2.1)
+
+- Une **nouvelle partie démarre à 0 €** : c'est René qui finance le départ. Les sauvegardes existantes
+  gardent leur caisse.
+- `openCars` : René complète la caisse jusqu'à **5 000 €** (de quoi acheter la citadine d'occasion à
+  4 000 €) et l'annonce dans sa bulle.
+- `buyUpgrade` : s'il manque de quoi payer la publicité, René complète (cadeau de bienvenue).
+- Fin du tutoriel (`goodbye` → `done`) : **20 000 €** de fonds de roulement.
+- Chaque don ne peut tomber qu'une fois (calculé d'après la caisse, ou sur la transition de fin) ;
+  rien pendant un « Revoir le tutoriel ».

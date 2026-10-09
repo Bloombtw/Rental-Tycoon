@@ -37,7 +37,9 @@ export function loadInitialState(o: {
 }): InitResult {
   const noTutorial = (ui: UiState): UiState =>
     o.tutorial === false ? { ...ui, tutorial: "done" } : ui;
-  const fresh = (): UiState => noTutorial(initUiState(createGame(o.newSeed())));
+  // A brand-new game starts with an empty till when René's tutorial gives the money.
+  const fresh = (): UiState =>
+    noTutorial(initUiState(createGame(o.newSeed(), o.tutorial === false ? undefined : 0)));
   const { storage } = o;
   if (o.initialGame) {
     return { ui: noTutorial(initUiState(o.initialGame)), status: storage ? "ok" : "unavailable" };

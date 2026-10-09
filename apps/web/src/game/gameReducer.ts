@@ -45,6 +45,8 @@ import { offlineDays, playOffline, type OfflineReport } from "./offline.js";
 import { departuresBetween } from "../scene/gains.js";
 import {
   initialTutorial,
+  TUTORIAL_FAREWELL_FUNDS,
+  TUTORIAL_START_FUNDS,
   isUiTutorialEvent,
   nextTutorialStep,
   settleTutorial,
@@ -190,6 +192,15 @@ export function settleUi(ui: UiState): UiState {
   if (ui.tutorial === "done") return ui.tutorialReplay ? { ...ui, tutorialReplay: false } : ui;
   const step = settleTutorial(ui.tutorial, ui.game, ui.tutorialReplay);
   let next: UiState = step === ui.tutorial ? ui : { ...ui, tutorial: step };
+  // The till starts empty: René tops it up so the first car can be bought (tutorial.md).
+  if (
+    (step === "openCars" || step === "buyUsed") &&
+    !ui.tutorialReplay &&
+    ui.game.fleet.length === 0 &&
+    ui.game.cash < TUTORIAL_START_FUNDS
+  ) {
+    next = gift(next, TUTORIAL_START_FUNDS - ui.game.cash, "René te lance :");
+  }
   if (step === "buyUpgrade" && !ui.tutorialReplay) {
     const missing = upgradeCost("ads", ui.game.upgrades.ads) - ui.game.cash;
     if (missing > 0) {
@@ -213,7 +224,23 @@ function advanceTutorial(prev: UiState, next: UiState, type: unknown): UiState {
   if (prev.tutorial !== "done") {
     for (const event of tutorialEvents(prev, next, type)) ui = applyTutorialEvent(ui, event);
   }
-  return settleUi(ui);
+  ui = settleUi(ui);
+  // René's parting gift (tutorial.md): once, when the first run ends (never on a replay).
+  if (prev.tutorial === "goodbye" && ui.tutorial === "done" && !prev.tutorialReplay) {
+    ui = gift(ui, TUTORIAL_FAREWELL_FUNDS, "René te laisse");
+  }
+  return ui;
+}
+
+/** Adds René's money to the cash with a notice. An overflowing cash gets nothing. */
+function gift(ui: UiState, amount: number, who: string): UiState {
+  try {
+    const game = giveWelcomeGift(ui.game, amount);
+    if (game === ui.game) return ui;
+    return { ...ui, game, notice: `${who} ${formatCents(game.cash - ui.game.cash)}.`, error: null };
+  } catch {
+    return ui;
+  }
 }
 
 /** Plays the offline days of an absence; a second absence before the claim adds up. */
@@ -347,7 +374,8 @@ function reduce(state: UiState, action: GameAction): UiState {
     case "newGame": {
       const seed: unknown = (action as { seed?: unknown }).seed;
       if (!isSeed(seed)) return state;
-      return { ...initUiState(createGame(seed)), notice: NEW_GAME_NOTICE };
+      // A new game starts with an empty till: René's tutorial provides the money.
+      return { ...initUiState(createGame(seed, 0)), notice: NEW_GAME_NOTICE };
     }
     case "purchaseFailed":
       return { ...state, notice: null, error: PURCHASE_FAILED_ERROR };

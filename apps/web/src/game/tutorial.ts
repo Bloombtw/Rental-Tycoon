@@ -76,6 +76,11 @@ export function isUiTutorialEvent(value: unknown): value is TutorialEvent {
 }
 
 /** First step for a game: the tutorial only runs for a brand-new agency. */
+/** Cash René tops the empty till up to before the first purchase (tutorial.md). */
+export const TUTORIAL_START_FUNDS = 5_000_00;
+/** René's parting gift when the tutorial ends. */
+export const TUTORIAL_FAREWELL_FUNDS = 20_000_00;
+
 export function initialTutorial(game: GameState): TutorialStep {
   return game.day === 0 && game.minute === 0 && game.fleet.length === 0 ? "welcome" : "done";
 }
@@ -204,7 +209,10 @@ export function tutorialScript(
       return WELCOME;
     case "openCars":
       return script(
-        ["Une agence sans voiture, c'est un parking vide… Ouvre le garage : touche « Voitures »."],
+        [
+          `La caisse est vide, alors je te lance : voilà ${money(TUTORIAL_START_FUNDS)}. Pas un centime de plus, hein !`,
+          "Une agence sans voiture, c'est un parking vide… Ouvre le garage : touche « Voitures ».",
+        ],
         dom("rail-cars"),
         "action",
         true,
@@ -308,6 +316,7 @@ export function tutorialScript(
         [
           first,
           "Ce bilan, tu le retrouveras chaque jour en haut de l'écran.",
+          `Et pour la route, je te laisse ${money(TUTORIAL_FAREWELL_FUNDS)} de fonds de roulement. Fais-les fructifier.`,
           "Bon… je te laisse les clés. Prends soin d'elle. Salut, patron !",
         ],
         dom("hud-report"),

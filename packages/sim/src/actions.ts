@@ -65,8 +65,8 @@ export function setCarPrice(state: GameState, carId: CarId, dailyPrice: Cents): 
   };
 }
 
-/** Most the welcome gift can give (tutorial.md): enough for the first upgrade. */
-export const MAX_WELCOME_GIFT: Cents = 10_000_00;
+/** Most one of René's gifts can give (tutorial.md): start money, upgrade top-up, farewell. */
+export const MAX_WELCOME_GIFT: Cents = 20_000_00;
 
 /**
  * René's welcome gift in the tutorial (tutorial.md): tops the cash up by `amount` (capped). Pure.

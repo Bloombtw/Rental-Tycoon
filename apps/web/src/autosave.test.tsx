@@ -159,7 +159,7 @@ describe("new game", () => {
     expect(maybe("new-game-dialog")).toBeNull();
     expect(byId("hud-clock").textContent).toBe("Jour 1 · 09:00");
     expect(byId("notice").textContent).toContain("Nouvelle partie commencée.");
-    expect(saved(s)).toEqual(createGame(99));
+    expect(saved(s)).toEqual(createGame(99, 0)); // a new game starts with an empty till
   });
 
   it("closes on Escape and pauses the game", () => {

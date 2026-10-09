@@ -3,7 +3,9 @@ import { advance, buyCar, buyUpgrade, createGame, upgradeCost } from "@rt/sim";
 import { gameReducer, initUiState, settleUi, type UiState } from "./gameReducer.js";
 import { decodeSave, encodeSave } from "./saveFormat.js";
 import {
+  TUTORIAL_FAREWELL_FUNDS,
   TUTORIAL_ORDER,
+  TUTORIAL_START_FUNDS,
   initialTutorial,
   nextTutorialStep,
   settleTutorial,
@@ -254,7 +256,8 @@ describe("tutorial flow through the reducer", () => {
     let s: UiState = initUiState(createGame(1, 0));
     s = run(s, { type: "tutorialEvent", event: { type: "tap" } });
     s = run(s, { type: "tutorialEvent", event: { type: "panelOpened", panel: "cars" } });
-    s = run(s, { type: "buyCar", model: "used" }); // no cash
+    // René tops the till up to 5 000 €: still not enough for a hybrid (16 000 €).
+    s = run(s, { type: "buyCar", model: "hybrid" });
     expect(s.tutorial).toBe("buyUsed");
     expect(s.error).not.toBeNull();
   });
@@ -365,5 +368,32 @@ describe("tutorial in the save envelope", () => {
       env["tutorial"] = bad;
       expect(decodeSave(JSON.stringify(env))).toMatchObject({ kind: "ok", tutorial: "done" });
     }
+  });
+});
+
+describe("René's money (tutorial.md)", () => {
+  it("a new game starts at 0 €; René gives the start money once, and the farewell gift at the end", () => {
+    let s: UiState = gameReducer(initUiState(createGame(1)), { type: "newGame", seed: 5 });
+    expect(s.game.cash).toBe(0);
+    s = run(s, { type: "tutorialEvent", event: { type: "tap" } });
+    expect(s.tutorial).toBe("openCars");
+    expect(s.game.cash).toBe(TUTORIAL_START_FUNDS);
+    // Settling again does not pay twice.
+    s = run(s, { type: "tutorialEvent", event: { type: "panelOpened", panel: "missions" } });
+    expect(s.game.cash).toBe(TUTORIAL_START_FUNDS);
+    const atGoodbye: UiState = { ...s, tutorial: "goodbye" };
+    const done = run(atGoodbye, { type: "tutorialEvent", event: { type: "tap" } });
+    expect(done.tutorial).toBe("done");
+    expect(done.game.cash).toBe(atGoodbye.game.cash + TUTORIAL_FAREWELL_FUNDS);
+    expect(done.notice).toContain("René");
+  });
+
+  it("a replay gives no money", () => {
+    const s: UiState = {
+      ...initUiState(createGame(1, 0)),
+      tutorial: "goodbye",
+      tutorialReplay: true,
+    };
+    expect(run(s, { type: "tutorialEvent", event: { type: "tap" } }).game.cash).toBe(0);
   });
 });
