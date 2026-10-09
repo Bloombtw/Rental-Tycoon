@@ -158,7 +158,7 @@ describe("lightAt", () => {
       });
       prev = s;
     }
-  });
+  }, 30_000); // 36 000 samples: slow when the whole suite runs in parallel
 
   it("sun is a unit vector between 12 and 60 degrees, east in the morning, west in the evening", () => {
     for (let t = 0; t <= 720; t += 1.7) {

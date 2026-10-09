@@ -186,7 +186,7 @@ describe("asset tables", () => {
   });
 
   it("scales", () => {
-    expect(KIT_SCALE).toEqual({ roads: 6, city: 6, cars: 1.4 });
+    expect(KIT_SCALE).toEqual({ roads: 6, city: 6, cars: 1.4, characters: 1 });
     expect(AGENCY_SCALE).toBe(7);
   });
 

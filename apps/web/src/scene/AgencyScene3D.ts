@@ -35,6 +35,8 @@ import type { Camera, ScreenRect } from "./camera.js";
 import { WHEEL_RADIUS, carPoseAt, type CarPose } from "./carMotion.js";
 import { computeCityPlan, type CityPlan } from "./cityPlan.js";
 import { CarInstancer, RentedDots } from "./gl/carInstances.js";
+import { People } from "./gl/people.js";
+import { customerPosesAt } from "./customers.js";
 import { buildCityMesh, type CityMesh } from "./gl/cityMesh.js";
 import { assetKey, disposeTemplates, loadTemplates, type Template } from "./gl/loader.js";
 import { NightLights } from "./gl/nightLights.js";
@@ -113,6 +115,7 @@ export class AgencyScene3D {
   private readonly ringMaterial: MeshBasicMaterial;
   private readonly signTexture: CanvasTexture;
   private readonly instancer: CarInstancer;
+  private readonly people: People;
   private readonly dots: RentedDots;
   private city: CityMesh | null = null;
   private night: NightLights | null = null;
@@ -204,6 +207,7 @@ export class AgencyScene3D {
       DOT_SIZE,
       MAX_FLEET_SIZE,
     );
+    this.people = new People(this.carLayer);
     this.applyLight(0);
 
     renderer.domElement.addEventListener("webglcontextlost", this.onContextLost);
@@ -238,7 +242,10 @@ export class AgencyScene3D {
       canvas.style.display = "block";
       canvas.style.touchAction = "none";
       host.appendChild(canvas);
-      return new AgencyScene3D(renderer, templates, o, tier);
+      const scene = new AgencyScene3D(renderer, templates, o, tier);
+      // Customers load in the background: the city is playable before they arrive.
+      void scene.people.load(o.baseUrl, o.isCancelled);
+      return scene;
     } catch (error) {
       if (templates) disposeTemplates(templates);
       renderer.dispose();
@@ -466,6 +473,17 @@ export class AgencyScene3D {
 
     for (const p of this.parked) this.instancer.add(p.asset, p.x, p.z, p.heading, 0, null);
     this.updateTraffic(plan, ambientSeconds, driving, headlights);
+    this.people.update(
+      customerPosesAt(
+        layout,
+        game.fleet,
+        game.minute,
+        game.customersLeft,
+        timeOfDay,
+        this.reducedMotion,
+      ),
+      ambientSeconds,
+    );
 
     this.instancer.end();
     this.dots.end();
@@ -577,6 +595,7 @@ export class AgencyScene3D {
     this.failure = null;
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
     this.instancer.dispose();
+    this.people.dispose();
     this.dots.dispose();
     this.night?.dispose();
     this.city?.dispose();

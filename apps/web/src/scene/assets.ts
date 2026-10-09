@@ -4,7 +4,7 @@ import type { TrafficModel } from "./traffic";
 
 /** Model -> Kenney asset mapping (spec 2.7). Pure: names and URLs only, nothing is loaded here. */
 
-export type Kit = "cars" | "roads" | "city";
+export type Kit = "cars" | "roads" | "city" | "characters";
 
 /** File `public/assets/{kit}/{name}.glb`. */
 export interface AssetRef {
@@ -132,7 +132,16 @@ export const KIT_SCALE: Readonly<Record<Kit, number>> = Object.freeze({
   roads: 6,
   city: 6,
   cars: 1.4,
+  // Characters are scaled to CUSTOMER_HEIGHT from their bounds instead (gl/people.ts).
+  characters: 1,
 });
+
+/** Customer models (Kenney animated characters), loaded after the scene is up. */
+export const CUSTOMER_ASSETS: readonly AssetRef[] = Object.freeze(
+  ["female-a", "female-c", "female-e", "male-a", "male-c", "male-e"].map((n) =>
+    ref("characters", `character-${n}`),
+  ),
+);
 
 /** The agency building is larger than its neighbours. */
 export const AGENCY_SCALE = 7;

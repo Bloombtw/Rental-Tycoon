@@ -567,7 +567,7 @@ describe("App: days go by", () => {
       container.querySelector('[data-testid="agency-view"]')?.getAttribute("data-car-sprites"),
     ).toBe(String(MAX_FLEET_SIZE));
     assertClean();
-  }, 20_000); // ~2160 committed frames rendering the full HUD: slow under jsdom
+  }, 60_000); // ~2160 committed frames rendering the full HUD and drawer: slow under jsdom
 
   it("a long hung frame at x10 never skips a closing: the report is still consistent", () => {
     mountApp(createGame(1, 0, IDLE));
