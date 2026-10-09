@@ -69,20 +69,27 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 6. ✅ **Managers / employés** (`managers.md`) : commercial (+ demande), gérant (ajuste les prix). Automatisent les actions manuelles. (Le mécanicien attend « Revente + usure », reporté.)
 7. ✅ **Récompense quotidienne** (`daily-reward.md`) (série de connexions).
 
+## Prioritaire — Boutique
+
+- ✅ **Boutique (argent réel, paiement crypto) — mode test** (`shop.md`) : diamants, pack de démarrage, boosters ; prestataire d'exemple NOWPayments via une fonction serverless (non déployée). Passage en réel : voir `docs/QUESTIONS.md`.
+
+## Phase 3 — Rétention (dans cet ordre)
+
+1. ✅ **Missions** (`missions.md`) : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
+2. ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Bannière + effet temporaire.
+3. ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
+
 ## Plus tard (si le temps le permet)
 
-- ⬜ **Sons et vibrations** (désactivables) : encaissement, achat, fin de journée.
-- ⬜ **Missions** : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
-- ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
+- ⬜ **Sons et vibrations** (désactivables) : encaissement, achat, fin de journée. **Attend les fichiers audio** (packs Kenney Interface Sounds / Casino Audio / Music Jingles en `.mp3` dans `apps/web/public/assets/sounds/`). Vibrations : Android seulement (Safari iOS ne les permet pas).
 - ⬜ **Nouvelles agences** (centre-ville, gare, aéroport) avec demande et clientèle différentes ; on bascule de l'une à l'autre.
-- ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Bannière + effet temporaire.
 - ⬜ **Crédit et faillite** : emprunt pour acheter au-delà de la caisse, game over après X jours de découvert.
 - ⬜ **Statistiques** : historique des jours, graphique de la caisse, rentabilité par modèle.
 - ⬜ **Prestige** : revendre l'entreprise contre un bonus permanent et recommencer plus vite.
 
 ## Règles pour l'agent lead
 
-- Enchaîner les points de la phase 2 dans l'ordre, en autonomie. Coder directement ; spec courte seulement pour les gros points.
+- Enchaîner les points de la phase en cours (Phase 3) dans l'ordre, en autonomie. Coder directement ; spec courte seulement pour les gros points.
 - Décision de design ambiguë : prendre l'option la plus raisonnable pour un tycoon mobile et la noter dans `docs/QUESTIONS.md`, sans bloquer.
 - Après chaque point : `npm run check` vert, commit, `git push`, cocher ici (⬜ → ✅). Une capture d'écran si le point est visuel.
 - Notification (`PushNotification`, une ligne en français) seulement si : question vraiment bloquante, échec bloquant après plusieurs tentatives, ou point terminé et poussé.

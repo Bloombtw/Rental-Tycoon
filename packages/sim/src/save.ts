@@ -18,6 +18,7 @@ import {
 } from "./state.js";
 import { DAY_MINUTES } from "./time.js";
 import { NO_DAILY_REWARD, type DailyRewardState } from "./dailyReward.js";
+import { ACTIVE_MISSIONS, INITIAL_MISSIONS, MISSIONS, type MissionsState } from "./missions.js";
 import {
   MAX_CLAIMED_ORDERS,
   NO_BOOSTS,
@@ -45,7 +46,7 @@ import {
 } from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 7;
+export const GAME_STATE_VERSION = 8;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -203,6 +204,7 @@ function parse(raw: unknown): GameState {
   const managers = parseManagers(own(raw, "managers"));
   const dailyReward = parseDailyReward(own(raw, "dailyReward"));
   const shop = parseShop(own(raw, "shop"));
+  const missions = parseMissions(own(raw, "missions"));
 
   return {
     seed,
@@ -217,12 +219,42 @@ function parse(raw: unknown): GameState {
     managers,
     dailyReward,
     shop,
+    missions,
     fleet,
     lastDay,
   };
 }
 
 /** v3 → v4: adds `xp` (a fresh agency: level 1, the first three models stay buyable). */
+/** v7 → v8: adds `missions` (the chain starts from the beginning). */
+function migrateV7(raw: unknown): unknown {
+  return isRecord(raw)
+    ? { ...raw, missions: { slots: [...INITIAL_MISSIONS.slots], next: INITIAL_MISSIONS.next } }
+    : raw;
+}
+
+function parseMissions(raw: unknown): MissionsState {
+  if (!isRecord(raw)) throw new InvalidGameStateError("missions", "type");
+  const next = int(own(raw, "next"), "missions.next", 0, MISSIONS.length);
+  const rawSlots = own(raw, "slots");
+  if (!Array.isArray(rawSlots) || rawSlots.length !== ACTIVE_MISSIONS) {
+    throw new InvalidGameStateError("missions.slots", "type");
+  }
+  const slots: (number | null)[] = [];
+  for (const v of rawSlots as unknown[]) {
+    if (v === null) {
+      slots.push(null);
+      continue;
+    }
+    const index = int(v, "missions.slots", 0, MISSIONS.length - 1);
+    if (index >= next || slots.includes(index)) {
+      throw new InvalidGameStateError("missions.slots", "inconsistent");
+    }
+    slots.push(index);
+  }
+  return { slots, next };
+}
+
 /** v6 → v7: adds `shop` (no diamonds, no booster, nothing bought). */
 function migrateV6(raw: unknown): unknown {
   return isRecord(raw)
@@ -357,6 +389,7 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
     if (stateVersion < 5) data = migrateV4(data);
     if (stateVersion < 6) data = migrateV5(data);
     if (stateVersion < 7) data = migrateV6(data);
+    if (stateVersion < 8) data = migrateV7(data);
   } catch {
     throw new InvalidGameStateError("$", "type");
   }

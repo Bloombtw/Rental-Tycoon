@@ -13,13 +13,15 @@ interface ManageDrawerProps {
   readonly fleetSize: number;
   /** Places in the parking (upgrades.md). Defaults to MAX_FLEET_SIZE. */
   readonly capacity?: number;
+  /** Rewards waiting (missions.md): a badge on the handle. */
+  readonly badge?: number;
   readonly onSetOpen: (open: boolean) => void;
   readonly children: ReactNode;
 }
 
 /** Floating glass bottom sheet on phones, floating side panel on wide landscape screens. */
 export const ManageDrawer = forwardRef<HTMLElement, ManageDrawerProps>(function ManageDrawer(
-  { open, fleetSize, capacity = MAX_FLEET_SIZE, onSetOpen, children },
+  { open, fleetSize, capacity = MAX_FLEET_SIZE, badge = 0, onSetOpen, children },
   ref,
 ) {
   const startY = useRef<number | null>(null);
@@ -78,6 +80,15 @@ export const ManageDrawer = forwardRef<HTMLElement, ManageDrawerProps>(function 
             />
           </span>
         </span>
+        {badge > 0 && (
+          <span
+            className="drawer-badge"
+            data-testid="drawer-badge"
+            aria-label={`${String(badge)} récompense(s) à récupérer`}
+          >
+            {badge}
+          </span>
+        )}
         <span className="drawer-chevron" aria-hidden="true">
           <Icon name="chevron-up" size={24} />
         </span>

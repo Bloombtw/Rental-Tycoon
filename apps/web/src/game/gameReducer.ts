@@ -10,6 +10,7 @@ import {
   fireManager,
   hireManager,
   levelForXp,
+  claimMission,
   setCarPrice,
   type BoosterId,
   type ManagerId,
@@ -32,6 +33,7 @@ import {
   UPGRADE_LABELS,
   errorMessage,
   levelUpNotice,
+  missionNotice,
 } from "./messages.js";
 import { offlineDays, playOffline, type OfflineReport } from "./offline.js";
 import { initialTutorial, tutorialNext, type TutorialStep } from "./tutorial.js";
@@ -67,6 +69,7 @@ export type GameAction =
   | { type: "activateBooster"; booster: BoosterId }
   /** The live checkout could not start (network, endpoint down). */
   | { type: "purchaseFailed" }
+  | { type: "claimMission"; slot: number }
   | { type: "advanceTime"; minutes: number }
   | { type: "setSpeed"; speed: Speed }
   | { type: "togglePause" }
@@ -149,6 +152,10 @@ function applyAction(game: GameState, action: GameAction): { game: GameState; no
         game: next,
         notice: `Prix de la voiture n°${action.carId} fixé à ${formatCents(applied?.dailyPrice ?? 0)}/jour.`,
       };
+    }
+    case "claimMission": {
+      const r = claimMission(game, action.slot);
+      return { game: r.state, notice: missionNotice([r.mission]) };
     }
     case "grantPurchase": {
       const next = grantPurchase(game, action.receipt);
@@ -258,6 +265,7 @@ function reduce(state: UiState, action: GameAction): UiState {
     case "claimDailyReward":
     case "grantPurchase":
     case "activateBooster":
+    case "claimMission":
       try {
         const result = applyAction(state.game, action);
         return { ...state, game: result.game, error: null, notice: result.notice };

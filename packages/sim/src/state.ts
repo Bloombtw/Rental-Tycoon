@@ -9,6 +9,7 @@ import { NO_UPGRADES, parkingLevelFor, type Upgrades } from "./upgrades.js";
 import { NO_MANAGERS, type Managers } from "./managers.js";
 import { NO_DAILY_REWARD, type DailyRewardState } from "./dailyReward.js";
 import { INITIAL_SHOP, type ShopState } from "./shop.js";
+import { INITIAL_MISSIONS, type MissionsState } from "./missions.js";
 
 /** Money is always an integer number of cents. Never use floats for money. */
 export type Cents = number;
@@ -63,6 +64,8 @@ export interface GameState {
   readonly dailyReward: DailyRewardState;
   /** Diamonds, boosters and real-money purchases (shop.md). */
   readonly shop: ShopState;
+  /** Active missions of the chain (missions.md). */
+  readonly missions: MissionsState;
   readonly fleet: readonly Car[];
   /** Report of the last closed day; null before the first closing. */
   readonly lastDay: DayReport | null;
@@ -125,6 +128,7 @@ export function createGame(
     managers: NO_MANAGERS,
     dailyReward: NO_DAILY_REWARD,
     shop: INITIAL_SHOP,
+    missions: INITIAL_MISSIONS,
     fleet: cars,
     lastDay: null,
   };

@@ -3,6 +3,7 @@ import {
   CAR_MODEL_IDS,
   PRODUCTS,
   BoosterUnaffordableError,
+  MissionNotReadyError,
   InvalidReceiptError,
   ProductAlreadyOwnedError,
   FleetFullError,
@@ -21,6 +22,8 @@ import {
   type CarModelId,
   type BoosterId,
   type ManagerId,
+  type Mission,
+  type MissionGoal,
   type ProductId,
   type UpgradeId,
 } from "@rt/sim";
@@ -76,6 +79,36 @@ export function purchaseNotice(productId: string): string {
   const p = PRODUCTS[productId as ProductId];
   const cash = p.cash > 0 ? ` et ${formatCents(p.cash)}` : "";
   return `Merci ! +${gemsText(p.gems)}${cash}.`;
+}
+
+/** French text of a mission goal. */
+export function missionText(goal: MissionGoal): string {
+  switch (goal.kind) {
+    case "ownCars":
+      return `Possédez ${String(goal.count)} voitures`;
+    case "ownModel":
+      return `Possédez ${String(goal.count)} × ${CAR_MODEL_LABELS[goal.model]}`;
+    case "dayRevenue":
+      return `Encaissez ${formatCents(goal.amount)} en une journée`;
+    case "cash":
+      return `Ayez ${formatCents(goal.amount)} en caisse`;
+    case "level":
+      return `Atteignez le niveau ${String(goal.level)}`;
+    case "upgrade":
+      return `${UPGRADE_LABELS[goal.upgrade]} : niveau ${String(goal.level)}`;
+    case "hire":
+      return `Embauchez un ${MANAGER_LABELS[goal.manager].toLowerCase()}`;
+  }
+}
+
+/** Notice for missions just completed. */
+export function missionNotice(completed: readonly Mission[]): string {
+  const total = completed.reduce((sum, m) => sum + m.reward, 0);
+  const first = completed[0];
+  if (completed.length === 1 && first) {
+    return `Mission accomplie : ${missionText(first.goal)} ! +${formatCents(total)}`;
+  }
+  return `${String(completed.length)} missions accomplies ! +${formatCents(total)}`;
 }
 
 export const MANAGER_LABELS: Readonly<Record<ManagerId, string>> = Object.freeze({
@@ -148,6 +181,7 @@ export function errorMessage(error: unknown): string {
       return error.alreadyHired ? "Déjà embauché." : "Personne à ce poste.";
     }
     if (error instanceof UnknownManagerError) return "Poste inconnu.";
+    if (error instanceof MissionNotReadyError) return "Cette mission n'est pas encore accomplie.";
     if (error instanceof BoosterUnaffordableError) {
       return `Pas assez de diamants : il en faut ${String(error.required)}.`;
     }

@@ -35,6 +35,17 @@ export default defineConfig({
             handler: "CacheFirst",
             options: { cacheName: "models", expiration: { maxEntries: 400 } },
           },
+          {
+            // Audio: rangeRequests so iOS Safari can seek/loop cached files.
+            urlPattern: /\/assets\/audio\/.+\.mp3$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "audio",
+              expiration: { maxEntries: 20 },
+              rangeRequests: true,
+              cacheableResponse: { statuses: [200] },
+            },
+          },
         ],
       },
     }),

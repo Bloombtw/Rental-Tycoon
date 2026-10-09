@@ -515,3 +515,17 @@ describe("buyUpgrade (upgrades.md)", () => {
     expect(r.error).toContain("Fonds insuffisants");
   });
 });
+
+describe("claimMission (missions.md)", () => {
+  it("pays a completed mission with a notice; an unfinished one is refused", () => {
+    let s = initUiState(createGame(1));
+    s = gameReducer(s, { type: "buyCar", model: "used" });
+    const refused = gameReducer(s, { type: "claimMission", slot: 0 });
+    expect(refused.game).toBe(s.game);
+    expect(refused.error).not.toBeNull();
+    s = gameReducer(s, { type: "buyCar", model: "used" });
+    const claimed = gameReducer(s, { type: "claimMission", slot: 0 });
+    expect(claimed.game.cash).toBe(s.game.cash + 1_000_00);
+    expect(claimed.notice).toContain("Mission accomplie");
+  });
+});

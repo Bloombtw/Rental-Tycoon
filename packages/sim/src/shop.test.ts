@@ -107,6 +107,6 @@ describe("save v7", () => {
       ),
       "demand_plus",
     );
-    expect(restoreGameState(JSON.parse(JSON.stringify(g)), 7)).toEqual(g);
+    expect(restoreGameState(JSON.parse(JSON.stringify(g)), 8)).toEqual(g);
   });
 });

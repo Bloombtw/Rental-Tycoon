@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  INITIAL_MISSIONS,
   INITIAL_SHOP,
   NO_DAILY_REWARD,
   NO_MANAGERS,
@@ -31,6 +32,7 @@ const state = (day: number, minute: number, fleet: readonly Car[]): GameState =>
   managers: NO_MANAGERS,
   dailyReward: NO_DAILY_REWARD,
   shop: INITIAL_SHOP,
+  missions: INITIAL_MISSIONS,
   fleet,
   lastDay: day === 0 ? null : { revenue: 0, costs: 0 },
 });

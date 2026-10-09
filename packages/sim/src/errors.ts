@@ -22,7 +22,8 @@ export type SimErrorCode =
   | "REWARD_ALREADY_CLAIMED"
   | "INVALID_RECEIPT"
   | "PRODUCT_ALREADY_OWNED"
-  | "BOOSTER_UNAFFORDABLE";
+  | "BOOSTER_UNAFFORDABLE"
+  | "MISSION_NOT_READY";
 
 /** Base class of every typed sim error. Extends RangeError for compatibility. */
 export abstract class SimError extends RangeError {
@@ -172,6 +173,17 @@ export class ManagerStateError extends SimError {
     this.name = "ManagerStateError";
     this.manager = manager;
     this.alreadyHired = alreadyHired;
+  }
+}
+
+export class MissionNotReadyError extends SimError {
+  readonly code = "MISSION_NOT_READY" as const;
+  readonly slot: unknown;
+
+  constructor(slot: unknown) {
+    super("no completed mission in this slot");
+    this.name = "MissionNotReadyError";
+    this.slot = slot;
   }
 }
 

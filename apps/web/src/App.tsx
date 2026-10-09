@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type CSSPropertie
 import { flushSync } from "react-dom";
 import {
   canClaimDailyReward,
+  claimableMissions,
   revenueMultiplier,
   type BoosterId,
   type ProductId,
@@ -15,6 +16,7 @@ import {
   type UpgradeId,
 } from "@rt/sim";
 import { ManagersPanel } from "./components/ManagersPanel.js";
+import { MissionsPanel } from "./components/MissionsPanel.js";
 import { UpgradesPanel } from "./components/UpgradesPanel.js";
 import { AgencyFallback, AgencyView } from "./components/AgencyView.js";
 import { BuyCarPanel } from "./components/BuyCarPanel.js";
@@ -180,6 +182,9 @@ export function App(props: {
     else if (tutorialStep === "run") setDrawerOpen(false);
   }
 
+  const onClaimMission = useCallback((slot: number) => {
+    dispatch({ type: "claimMission", slot });
+  }, []);
   const onClaimOffline = useCallback(() => {
     dispatch({ type: "claimOffline" });
   }, []);
@@ -371,11 +376,13 @@ export function App(props: {
         open={drawerOpen}
         fleetSize={game.fleet.length}
         capacity={capacity}
+        badge={claimableMissions(game)}
         onSetOpen={setDrawerOpen}
       >
         {coachInDrawer && (
           <CoachCard step={ui.tutorial} onNext={onTutorialNext} onSkip={onSkipTutorial} />
         )}
+        {ui.tutorial === "done" && <MissionsPanel game={game} onClaim={onClaimMission} />}
         <FleetPanel fleet={game.fleet} onSetPrice={onSetPrice} />
         <BuyCarPanel
           cash={game.cash}
