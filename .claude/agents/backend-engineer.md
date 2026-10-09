@@ -10,10 +10,6 @@ hooks:
       hooks:
         - type: command
           command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-scope.mjs" apps/server/
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-bash.mjs"
 ---
 
 You own `apps/server` (Fastify + `node:sqlite` + zod).

@@ -10,10 +10,6 @@ hooks:
       hooks:
         - type: command
           command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-scope.mjs" packages/sim/
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-bash.mjs"
 ---
 
 You own `packages/sim`: the deterministic heart of the game.
