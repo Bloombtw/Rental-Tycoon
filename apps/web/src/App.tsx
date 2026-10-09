@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type CSSPropertie
 import { flushSync } from "react-dom";
 import {
   canClaimDailyReward,
+  activeEvent,
   claimableMissions,
   revenueMultiplier,
   type BoosterId,
@@ -37,6 +38,7 @@ import {
 import { calendarDay } from "./game/calendar.js";
 import { useGameAudio } from "./game/useGameAudio.js";
 import { DayBanner } from "./components/DayBanner.js";
+import { EventBanner } from "./components/EventBanner.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { FleetPanel } from "./components/FleetPanel.js";
 import { Hud } from "./components/Hud.js";
@@ -341,6 +343,12 @@ export function App(props: {
   const onDismissBanner = useCallback(() => {
     dispatch({ type: "dismissDayBanner" });
   }, []);
+  const onDismissEventBanner = useCallback(() => {
+    dispatch({ type: "dismissEventBanner" });
+  }, []);
+  const onEventInfo = useCallback(() => {
+    dispatch({ type: "eventInfo" });
+  }, []);
 
   return (
     <main
@@ -363,6 +371,7 @@ export function App(props: {
           hasRun={ui.hasRun}
           onSetSpeed={onSetSpeed}
           onTogglePause={onTogglePause}
+          onEventInfo={onEventInfo}
         />
         <SaveWarning
           status={autosave.status}
@@ -385,9 +394,19 @@ export function App(props: {
             onQualityChange={setQuality}
           />
         </ErrorBoundary>
-        {ui.dayBanner !== null && (
-          <DayBanner text={ui.dayBanner} speed={ui.speed} onDismiss={onDismissBanner} />
-        )}
+        <div className="banner-stack">
+          {ui.dayBanner !== null && (
+            <DayBanner text={ui.dayBanner} speed={ui.speed} onDismiss={onDismissBanner} />
+          )}
+          {ui.eventBanner !== null && (
+            <EventBanner
+              text={ui.eventBanner}
+              kind={activeEvent(game)?.kind ?? null}
+              speed={ui.speed}
+              onDismiss={onDismissEventBanner}
+            />
+          )}
+        </div>
       </div>
       <ManageDrawer
         ref={drawerRef}

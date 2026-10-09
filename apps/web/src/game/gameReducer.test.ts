@@ -63,6 +63,7 @@ describe("initUiState", () => {
       paused: true,
       hasRun: false,
       dayBanner: null,
+      eventBanner: null,
       offline: null,
       tutorial: "buy", // a brand-new agency starts the tutorial
     });
@@ -302,7 +303,7 @@ describe("gameReducer", () => {
   });
 
   it("spam advanceTime 720 x1000: exactly 1000 days, no junk", () => {
-    let s: UiState = running(createGame(1, 0, IDLE));
+    let s: UiState = running({ ...createGame(1, 0, IDLE), nextEventDay: Number.MAX_SAFE_INTEGER });
     for (let i = 0; i < 1000; i++) s = gameReducer(s, DAY);
     expect(s.game.day).toBe(1000);
     expect(s.game.cash).toBe(-1000 * 50_00);
@@ -527,5 +528,69 @@ describe("claimMission (missions.md)", () => {
     const claimed = gameReducer(s, { type: "claimMission", slot: 0 });
     expect(claimed.game.cash).toBe(s.game.cash + 1_000_00);
     expect(claimed.notice).toContain("Mission accomplie");
+  });
+});
+
+describe("events (events.md)", () => {
+  const DAY_ACTION: GameAction = { type: "advanceTime", minutes: 720 };
+  const withEvent = (kind: "holidays" | "storm", startDay: number, endDay: number): GameState => ({
+    ...createGame(1, 50_000_00, MIXED),
+    event: { kind, startDay, endDay },
+    nextEventDay: 99,
+  });
+
+  it("a new event drawn at the day opening sets the banner during advanceTime", () => {
+    // Day 1, minute 0: the first step processes the opening, which draws the event.
+    const g: GameState = { ...createGame(1, 50_000_00, MIXED), day: 1, nextEventDay: 1 };
+    const s = gameReducer(running(g), { type: "advanceTime", minutes: 10 });
+    expect(s.game.event).not.toBeNull();
+    expect(s.eventBanner).not.toBeNull();
+    expect(s.eventBanner).toContain("Événement : ");
+    expect(s.eventBanner).not.toMatch(/NaN|undefined/);
+  });
+
+  it("no banner while the next event is not due, nor for an event already running", () => {
+    const quiet = gameReducer(running(createGame(1, 50_000_00, MIXED)), DAY_ACTION);
+    expect(quiet.game.event).toBeNull();
+    expect(quiet.eventBanner).toBeNull();
+    // Already active at the start of the step and still the same one after it: no new banner.
+    const s = gameReducer(running(withEvent("holidays", 0, 3)), {
+      type: "advanceTime",
+      minutes: 10,
+    });
+    expect(s.eventBanner).toBeNull();
+  });
+
+  it("an event carried by a loaded game does not pop a banner by itself", () => {
+    expect(initUiState(withEvent("storm", 1, 2)).eventBanner).toBeNull();
+  });
+
+  it("the offline days and a new game clear the event banner", () => {
+    const withBanner: UiState = { ...running(), eventBanner: "x" };
+    expect(
+      gameReducer(withBanner, { type: "returnAfter", elapsedMs: 3 * 60 * 60 * 1000 }).eventBanner,
+    ).toBeNull();
+    expect(gameReducer(withBanner, { type: "newGame", seed: 7 }).eventBanner).toBeNull();
+  });
+
+  it("dismissEventBanner clears only the event banner; none returns the same state", () => {
+    const start = running();
+    expect(gameReducer(start, { type: "dismissEventBanner" })).toBe(start);
+    const withBanner: UiState = { ...start, eventBanner: "x", dayBanner: "d", notice: "n" };
+    expect(gameReducer(withBanner, { type: "dismissEventBanner" })).toEqual({
+      ...withBanner,
+      eventBanner: null,
+    });
+  });
+
+  it("eventInfo turns the active event into a notice; without an event it is a no-op", () => {
+    const none = running();
+    expect(gameReducer(none, { type: "eventInfo" })).toBe(none);
+    const s = gameReducer(
+      { ...running(), game: withEvent("holidays", 0, 3) },
+      { type: "eventInfo" },
+    );
+    expect(s.notice).toBe("Vacances scolaires : Clients × 2.");
+    expect(s.error).toBeNull();
   });
 });

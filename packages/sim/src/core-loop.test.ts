@@ -37,6 +37,8 @@ const MIXED: readonly NewCar[] = [
   { dailyPrice: 300_00, dailyCost: 50_00 },
 ];
 const C: Cents = 10_000_00;
+/** No random event ever starts (a car show would make the 2x-reference cars rentable). */
+const quiet = (g: GameState): GameState => ({ ...g, nextEventDay: Number.MAX_SAFE_INTEGER });
 
 /** Sum of the prices of the cars rented in this fleet snapshot. */
 function revenueOf(fleet: readonly Car[]): number {
@@ -631,7 +633,7 @@ describe("tick: revenue", () => {
   });
 
   it.each([1, 30, 365, 3650])("IDLE: advance %i days => C - N * 50_00", (n) => {
-    expect(advance(createGame(3, C * 1000, IDLE), n).cash).toBe(C * 1000 - n * 50_00);
+    expect(advance(quiet(createGame(3, C * 1000, IDLE)), n).cash).toBe(C * 1000 - n * 50_00);
   });
 
   it("IDLE: no car is ever rented and cash goes negative without error", () => {
@@ -642,7 +644,7 @@ describe("tick: revenue", () => {
   });
 
   it("negative cash keeps simulating normally (no bankruptcy / blocking)", () => {
-    const g = advance(createGame(1, 0, IDLE), 1000);
+    const g = advance(quiet(createGame(1, 0, IDLE)), 1000);
     expect(g.cash).toBe(-1000 * 50_00);
     expect(g.day).toBe(1000);
     expect(tick(g).day).toBe(1001);
@@ -760,7 +762,7 @@ describe("tick: revenue", () => {
         "upgrades",
         "xp",
       ]
-        .concat(["managers", "dailyReward", "shop", "missions"])
+        .concat(["managers", "dailyReward", "shop", "missions", "event", "nextEventDay"])
         .sort(),
     );
     for (const c of t.fleet) {
@@ -1198,6 +1200,9 @@ describe("overflow", () => {
       ...createGame(1, 0, PROFITABLE),
       cash: Number.MAX_SAFE_INTEGER,
       day: Number.MAX_SAFE_INTEGER,
+      // A running event, so no draw happens at the opening and the rng sequence stays as before.
+      event: { kind: "carShow", startDay: 0, endDay: Number.MAX_SAFE_INTEGER },
+      nextEventDay: Number.MAX_SAFE_INTEGER,
     };
     expectOverflow(() => tick(g), "cash");
   });

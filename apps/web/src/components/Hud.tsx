@@ -1,11 +1,13 @@
 import { forwardRef } from "react";
-import { DAY_MINUTES, levelForXp, type GameState } from "@rt/sim";
+import { DAY_MINUTES, activeEvent, eventDaysLeft, levelForXp, type GameState } from "@rt/sim";
 import { formatCents } from "../format.js";
 import { formatClock, type Speed } from "../game/clock.js";
+import { EVENT_LABELS, EVENT_SHORT_LABELS, eventEffectText } from "../game/messages.js";
 import { AnimatedCents } from "../ui/AnimatedCents.js";
 import { Icon, type IconName } from "../ui/icons.js";
 import { ProgressBar } from "../ui/ProgressBar.js";
 import { usePop } from "../ui/usePop.js";
+import { EVENT_ICONS } from "./EventBanner.js";
 import { SpeedControls } from "./SpeedControls.js";
 
 interface HudProps {
@@ -18,6 +20,8 @@ interface HudProps {
   /** Sound off (sounds.md). The button is hidden without a handler. */
   readonly muted?: boolean;
   readonly onToggleMute?: () => void;
+  /** Tap on the event chip (reminds the effect). The chip is still shown without a handler. */
+  readonly onEventInfo?: () => void;
 }
 
 /** Minutes since 09:00 at which the sun icon turns into a sunset (18:00) and a moon (20:00). */
@@ -29,12 +33,45 @@ function clockIcon(minute: number): IconName {
   return minute < MOON_MINUTE ? "sunset" : "moon";
 }
 
-function Report({ game }: { readonly game: GameState }) {
+/** Active event pill: round icon, short name, days left. Tap = reminder of the effect. */
+function EventChip({ game, onTap }: { readonly game: GameState; readonly onTap?: () => void }) {
+  const event = activeEvent(game);
+  if (event === null) return null;
+  const left = eventDaysLeft(game);
+  const days = Number.isSafeInteger(left) && left >= 1 ? left : 1;
+  const label = `${EVENT_LABELS[event.kind]} : ${eventEffectText(event.kind)}, encore ${String(days)} jour${days > 1 ? "s" : ""}`;
+  return (
+    <button
+      type="button"
+      className="event-chip"
+      data-testid="hud-event"
+      data-kind={event.kind}
+      title={label}
+      aria-label={label}
+      onClick={onTap}
+    >
+      <span className="event-chip-icon">
+        <Icon name={EVENT_ICONS[event.kind]} size={16} />
+      </span>
+      <span className="event-chip-name">{EVENT_SHORT_LABELS[event.kind]}</span>
+      <span className="event-chip-days">{`${String(days)} j`}</span>
+    </button>
+  );
+}
+
+function Report({
+  game,
+  onEventInfo,
+}: {
+  readonly game: GameState;
+  readonly onEventInfo?: () => void;
+}) {
   const report = game.lastDay;
   const today = Number.isSafeInteger(game.todayRevenue) ? game.todayRevenue : 0;
   const todayText = `Aujourd'hui : +${formatCents(today)}`;
   // The pill re-mounts (and pops) whenever the value changes, never at first render.
   const pop = usePop(today);
+  const chip = <EventChip game={game} {...(onEventInfo ? { onTap: onEventInfo } : {})} />;
   const todayPill = (
     <span className="hud-today" data-testid="hud-today" key={pop} data-pop={String(pop > 0)}>
       <span className="hud-sep">{" · "}</span>
@@ -44,6 +81,7 @@ function Report({ game }: { readonly game: GameState }) {
   if (report === null) {
     return (
       <p className="hud-report" data-testid="hud-report">
+        {chip}
         Aucune journée écoulée.
         {todayPill}
       </p>
@@ -54,6 +92,7 @@ function Report({ game }: { readonly game: GameState }) {
   const netText = `${net > 0 ? "+" : ""}${formatCents(net)}`;
   return (
     <p className="hud-report" data-testid="hud-report" data-sign={sign}>
+      {chip}
       Hier : recettes {formatCents(report.revenue)} · charges {formatCents(report.costs)} · résultat{" "}
       <span className="hud-net">
         {sign !== "zero" && (
@@ -68,7 +107,17 @@ function Report({ game }: { readonly game: GameState }) {
 
 /** Floating glass card at the top of the screen: clock, cash, speed controls and yesterday's report. */
 export const Hud = forwardRef<HTMLElement, HudProps>(function Hud(
-  { game, speed, paused, hasRun, onSetSpeed, onTogglePause, muted = false, onToggleMute },
+  {
+    game,
+    speed,
+    paused,
+    hasRun,
+    onSetSpeed,
+    onTogglePause,
+    muted = false,
+    onToggleMute,
+    onEventInfo,
+  },
   ref,
 ) {
   const negative = game.cash < 0;
@@ -139,7 +188,7 @@ export const Hud = forwardRef<HTMLElement, HudProps>(function Hud(
         onSetSpeed={onSetSpeed}
         onTogglePause={onTogglePause}
       />
-      <Report game={game} />
+      <Report game={game} {...(onEventInfo ? { onEventInfo } : {})} />
     </header>
   );
 });

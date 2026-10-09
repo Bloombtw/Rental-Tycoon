@@ -2,6 +2,7 @@ export * from "./actions.js";
 export * from "./dailyReward.js";
 export * from "./economy.js";
 export * from "./errors.js";
+export * from "./events.js";
 export * from "./rng.js";
 export * from "./save.js";
 export * from "./shop.js";

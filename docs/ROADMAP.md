@@ -81,7 +81,7 @@ Légende : ✅ fait · 🚧 en cours · ⬜ à faire
 ## Phase 3 — Rétention (dans cet ordre)
 
 1. ✅ **Missions** (`missions.md`) : 3 objectifs actifs à la fois (« Possède 5 hybrides », « Gagne 10 000 € en un jour »…), récompense à chaque mission, remplacée par la suivante.
-2. ⬜ **Événements** : vacances (demande ×2), salon de l'auto, grève, tempête. Effet temporaire.
+2. ✅ **Événements** (`events.md`) : vacances (demande ×2), salon de l'auto, grève, tempête. Effet temporaire.
    - **Mis en avant par une petite bannière** en haut de l'écran, sous le HUD : icône dessinée, nom de l'événement, effet en clair (« Demande ×2 ») et compte à rebours ou durée restante. Elle entre en glissant, reste visible tant que l'événement dure, sans masquer la scène ni bloquer les taps. Un tap sur la bannière ouvre le détail. Couleur selon le type (bonus ou malus) via `tokens.css`. Au plus une bannière à la fois ; si plusieurs événements sont actifs, afficher le plus récent avec un badge « +1 ».
 3. ⬜ **Revente + usure** : valeur de revente décroissante avec l'âge, pannes aléatoires, entretien (+ mécanicien). Introduire `nextCarId` (ne jamais réutiliser un id).
 

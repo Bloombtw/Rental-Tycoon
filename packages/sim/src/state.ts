@@ -10,6 +10,7 @@ import { NO_MANAGERS, type Managers } from "./managers.js";
 import { NO_DAILY_REWARD, type DailyRewardState } from "./dailyReward.js";
 import { INITIAL_SHOP, type ShopState } from "./shop.js";
 import { INITIAL_MISSIONS, type MissionsState } from "./missions.js";
+import { FIRST_EVENT_DAY, type ActiveEvent } from "./events.js";
 
 /** Money is always an integer number of cents. Never use floats for money. */
 export type Cents = number;
@@ -66,6 +67,10 @@ export interface GameState {
   readonly shop: ShopState;
   /** Active missions of the chain (missions.md). */
   readonly missions: MissionsState;
+  /** Running or finished random event; null when none (events.md). */
+  readonly event: ActiveEvent | null;
+  /** First day on which a new event may start (events.md). */
+  readonly nextEventDay: number;
   readonly fleet: readonly Car[];
   /** Report of the last closed day; null before the first closing. */
   readonly lastDay: DayReport | null;
@@ -129,6 +134,8 @@ export function createGame(
     dailyReward: NO_DAILY_REWARD,
     shop: INITIAL_SHOP,
     missions: INITIAL_MISSIONS,
+    event: null,
+    nextEventDay: FIRST_EVENT_DAY,
     fleet: cars,
     lastDay: null,
   };

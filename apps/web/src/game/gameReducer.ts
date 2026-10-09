@@ -1,5 +1,6 @@
 import {
   CAR_MODELS,
+  activeEvent,
   advanceMinutes,
   buyCar,
   activateBooster,
@@ -32,6 +33,9 @@ import {
   purchaseNotice,
   UPGRADE_LABELS,
   errorMessage,
+  EVENT_LABELS,
+  eventBannerText,
+  eventEffectText,
   levelUpNotice,
   missionNotice,
 } from "./messages.js";
@@ -52,6 +56,8 @@ export interface UiState {
   readonly hasRun: boolean;
   /** "New day" toast text. */
   readonly dayBanner: string | null;
+  /** "Event started" toast text (events.md). */
+  readonly eventBanner: string | null;
   /** Result of the last absence, shown until the player taps "Récupérer". Already in `game`. */
   readonly offline: OfflineReport | null;
   /** Guided first minute (tutorial.md); "done" once finished or skipped. */
@@ -76,6 +82,9 @@ export type GameAction =
   | { type: "pause" }
   | { type: "dismissMessage" }
   | { type: "dismissDayBanner" }
+  | { type: "dismissEventBanner" }
+  /** The player tapped the HUD event chip: remind the effect as a notice. */
+  | { type: "eventInfo" }
   | { type: "newGame"; seed: number }
   /** The player was away `elapsedMs` (closed app or background): play the offline days. */
   | { type: "returnAfter"; elapsedMs: number }
@@ -97,6 +106,7 @@ export function initUiState(game?: GameState): UiState {
     paused: true,
     hasRun: false,
     dayBanner: null,
+    eventBanner: null,
     offline: null,
     tutorial: initialTutorial(g),
   };
@@ -129,6 +139,7 @@ function returnAfter(state: UiState, elapsedMs: unknown): UiState {
     offline: report,
     paused: true,
     dayBanner: null,
+    eventBanner: null,
     notice: null,
   };
 }
@@ -205,10 +216,18 @@ function advanceTime(state: UiState, minutes: unknown): UiState {
     const closed = next.day > state.game.day;
     const before = levelForXp(state.game.xp);
     const after = levelForXp(next.xp);
+    const event = activeEvent(next);
+    const prevEvent = activeEvent(state.game);
+    const started =
+      event !== null &&
+      (prevEvent === null ||
+        prevEvent.kind !== event.kind ||
+        prevEvent.startDay !== event.startDay);
     return {
       ...state,
       game: next,
       dayBanner: closed ? dayBannerText(next.day, next.lastDay) : state.dayBanner,
+      eventBanner: started ? eventBannerText(event) : state.eventBanner,
       ...(after > before ? { notice: levelUpNotice(after), error: null } : {}),
     };
   } catch (err) {
@@ -246,6 +265,17 @@ function reduce(state: UiState, action: GameAction): UiState {
       return { ...state, error: null, notice: null };
     case "dismissDayBanner":
       return state.dayBanner === null ? state : { ...state, dayBanner: null };
+    case "dismissEventBanner":
+      return state.eventBanner === null ? state : { ...state, eventBanner: null };
+    case "eventInfo": {
+      const event = activeEvent(state.game);
+      if (event === null) return state;
+      return {
+        ...state,
+        error: null,
+        notice: `${EVENT_LABELS[event.kind]} : ${eventEffectText(event.kind)}.`,
+      };
+    }
     case "advanceTime":
       return advanceTime(state, (action as { minutes?: unknown }).minutes);
     case "setSpeed": {

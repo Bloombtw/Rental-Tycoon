@@ -106,6 +106,8 @@ function stateOf(
     dailyReward: NO_DAILY_REWARD,
     shop: INITIAL_SHOP,
     missions: INITIAL_MISSIONS,
+    event: null,
+    nextEventDay: 3,
     fleet,
     lastDay: null,
     ...extra,
@@ -128,6 +130,8 @@ const STATE_KEYS = [
   "dailyReward",
   "shop",
   "missions",
+  "event",
+  "nextEventDay",
 ].sort();
 
 /** Parking at its maximum (50 places) so the tests can buy freely (upgrades.md). */

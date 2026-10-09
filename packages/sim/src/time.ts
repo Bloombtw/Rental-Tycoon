@@ -7,6 +7,13 @@ import {
   referencePrice,
   rentalXp,
 } from "./economy.js";
+import {
+  drawEvent,
+  EVENT_COOLDOWN_MAX_DAYS,
+  EVENT_COOLDOWN_MIN_DAYS,
+  eventDemandPct,
+  eventReferencePct,
+} from "./events.js";
 import { InvalidMinutesError, SimOverflowError } from "./errors.js";
 import { createRng, type Rng } from "./rng.js";
 import { adsBonusPct, boostedAcceptance, washedReference } from "./upgrades.js";
@@ -70,6 +77,8 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   let todayRevenue = state.todayRevenue;
   let day = state.day;
   let lastDay = state.lastDay;
+  let event = state.event;
+  let nextEventDay = state.nextEventDay;
   const left = state.customersLeft;
   let customersLeft = typeof left === "number" && Number.isSafeInteger(left) && left > 0 ? left : 0;
   let xp = Number.isSafeInteger(state.xp) && state.xp > 0 ? state.xp : 0;
@@ -82,17 +91,25 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
   const depart = (from: number, to: number): void => {
     if (to <= from) return;
     if (from === 0) {
+      // Events change before the customers are drawn (events.md).
+      if (event !== null && day >= event.endDay) {
+        event = null;
+        nextEventDay = day + draw().int(EVENT_COOLDOWN_MIN_DAYS, EVENT_COOLDOWN_MAX_DAYS);
+      }
+      if (event === null && day >= nextEventDay) event = drawEvent(draw(), day);
       const bonus =
         adsBonusPct(state.upgrades) +
         salesBonusPct(state.managers) +
         boostDemandPct({ ...state, day });
       const pct = draw().int(DEMAND_MIN_PCT + bonus, DEMAND_MAX_PCT + bonus);
-      customersLeft = DEMAND_BASE + Math.round((state.fleet.length * pct) / 100);
+      const base = DEMAND_BASE + Math.round((state.fleet.length * pct) / 100);
+      customersLeft = Math.round((base * eventDemandPct({ ...state, day, event })) / 100);
       // The pricing manager sets the day's prices before the first customer (managers.md).
       const current = copy ?? state.fleet;
       const managed = managedFleet(current, state.managers, state.upgrades);
       if (managed !== current) copy = managed.slice();
     }
+    const referencePct = eventReferencePct({ ...state, day, event });
     const first = Math.ceil(from / DEPARTURE_STAGGER_MINUTES);
     const limit = Math.min(state.fleet.length, MAX_FLEET_SIZE);
     for (let i = first; i < limit && i * DEPARTURE_STAGGER_MINUTES < to; i++) {
@@ -103,7 +120,9 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
         outcome = "noCustomer";
       } else {
         customersLeft -= 1;
-        const reference = washedReference(referencePrice(car), state.upgrades);
+        const reference = Math.round(
+          (washedReference(referencePrice(car), state.upgrades) * referencePct) / 100,
+        );
         const chance = boostedAcceptance(
           acceptanceChance(car.dailyPrice, reference),
           state.upgrades,
@@ -159,6 +178,8 @@ export function advanceMinutes(state: GameState, minutes: number): GameState {
     dailyReward: state.dailyReward,
     shop: state.shop,
     missions: state.missions,
+    event,
+    nextEventDay,
     fleet: copy ?? state.fleet,
     lastDay,
   };

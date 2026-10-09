@@ -1,15 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { dayBannerDurationMs, type Speed } from "../game/clock.js";
-import { Icon } from "../ui/icons.js";
+import { Icon, type IconName } from "../ui/icons.js";
 
 interface DayBannerProps {
   readonly text: string;
   readonly speed: Speed;
   readonly onDismiss: () => void;
+  /** Event toast variant: own icon and test id. */
+  readonly icon?: IconName;
+  readonly testId?: string;
 }
 
 /** "New day" toast. Fixed duration chosen when it appears; a new text restarts the timer. */
-export function DayBanner({ text, speed, onDismiss }: DayBannerProps) {
+export function DayBanner({
+  text,
+  speed,
+  onDismiss,
+  icon = "sun",
+  testId = "day-banner",
+}: DayBannerProps) {
   const speedRef = useRef(speed);
   const dismissRef = useRef(onDismiss);
   // The bar's length is frozen when the text arrives (like the timer): a later speed change
@@ -33,11 +42,11 @@ export function DayBanner({ text, speed, onDismiss }: DayBannerProps) {
       <button
         type="button"
         className="day-banner glass-dark"
-        data-testid="day-banner"
+        data-testid={testId}
         role="status"
         onClick={onDismiss}
       >
-        <Icon name="sun" size={20} className="day-banner-icon" />
+        <Icon name={icon} size={20} className="day-banner-icon" />
         <span className="day-banner-text">{text}</span>
         <span
           key={frozen.text}

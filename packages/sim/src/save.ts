@@ -17,6 +17,7 @@ import {
   type RentalOutcome,
 } from "./state.js";
 import { DAY_MINUTES } from "./time.js";
+import { EVENT_KINDS, FIRST_EVENT_DAY, MAX_EVENT_DEMAND_PCT, type ActiveEvent } from "./events.js";
 import { NO_DAILY_REWARD, type DailyRewardState } from "./dailyReward.js";
 import { ACTIVE_MISSIONS, INITIAL_MISSIONS, MISSIONS, type MissionsState } from "./missions.js";
 import {
@@ -46,7 +47,7 @@ import {
 } from "./upgrades.js";
 
 /** Shape version of GameState. Bump on ANY shape change and add a migration. */
-export const GAME_STATE_VERSION = 8;
+export const GAME_STATE_VERSION = 9;
 
 export type GameStateIssue = "type" | "range" | "unknownModel" | "duplicateId" | "inconsistent";
 
@@ -143,12 +144,16 @@ function parseCar(raw: unknown, index: number, seen: Set<number>): Car {
 }
 
 /** Most customers a day can draw (full fleet, top of the demand range). */
-const MAX_CUSTOMERS =
-  DEMAND_BASE +
-  Math.round(
-    (MAX_FLEET_SIZE * (DEMAND_MAX_PCT + ADS_BONUS_PCT * UPGRADES.ads.maxLevel + SALES_BONUS_PCT)) /
-      100,
-  );
+const MAX_CUSTOMERS = Math.round(
+  ((DEMAND_BASE +
+    Math.round(
+      (MAX_FLEET_SIZE *
+        (DEMAND_MAX_PCT + ADS_BONUS_PCT * UPGRADES.ads.maxLevel + SALES_BONUS_PCT)) /
+        100,
+    )) *
+    MAX_EVENT_DEMAND_PCT) /
+    100,
+);
 
 function parseUpgrades(raw: unknown): Upgrades {
   if (!isRecord(raw)) throw new InvalidGameStateError("upgrades", "type");
@@ -205,6 +210,8 @@ function parse(raw: unknown): GameState {
   const dailyReward = parseDailyReward(own(raw, "dailyReward"));
   const shop = parseShop(own(raw, "shop"));
   const missions = parseMissions(own(raw, "missions"));
+  const event = parseEvent(own(raw, "event"));
+  const nextEventDay = int(own(raw, "nextEventDay"), "nextEventDay", 0, Number.MAX_SAFE_INTEGER);
 
   return {
     seed,
@@ -220,9 +227,32 @@ function parse(raw: unknown): GameState {
     dailyReward,
     shop,
     missions,
+    event,
+    nextEventDay,
     fleet,
     lastDay,
   };
+}
+
+/** v8 → v9: adds `event` and `nextEventDay` (no event, the first one in a few days). */
+function migrateV8(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const day = own(raw, "day");
+  const base = typeof day === "number" && Number.isSafeInteger(day) && day >= 0 ? day : 0;
+  return { ...raw, event: null, nextEventDay: base + FIRST_EVENT_DAY };
+}
+
+function parseEvent(raw: unknown): ActiveEvent | null {
+  if (raw === null) return null;
+  if (!isRecord(raw)) throw new InvalidGameStateError("event", "type");
+  const k = own(raw, "kind");
+  if (typeof k !== "string") throw new InvalidGameStateError("event.kind", "type");
+  const kind = EVENT_KINDS.find((candidate) => candidate === k);
+  if (kind === undefined) throw new InvalidGameStateError("event.kind", "range");
+  const startDay = int(own(raw, "startDay"), "event.startDay", 0, Number.MAX_SAFE_INTEGER);
+  const endDay = int(own(raw, "endDay"), "event.endDay", 0, Number.MAX_SAFE_INTEGER);
+  if (startDay > endDay) throw new InvalidGameStateError("event.endDay", "inconsistent");
+  return { kind, startDay, endDay };
 }
 
 /** v3 → v4: adds `xp` (a fresh agency: level 1, the first three models stay buyable). */
@@ -390,6 +420,7 @@ export function restoreGameState(raw: unknown, stateVersion: unknown): GameState
     if (stateVersion < 6) data = migrateV5(data);
     if (stateVersion < 7) data = migrateV6(data);
     if (stateVersion < 8) data = migrateV7(data);
+    if (stateVersion < 9) data = migrateV8(data);
   } catch {
     throw new InvalidGameStateError("$", "type");
   }

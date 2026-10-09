@@ -3,6 +3,8 @@ import {
   CAR_MODEL_IDS,
   PRODUCTS,
   BoosterUnaffordableError,
+  EVENTS,
+  EVENT_KINDS,
   MissionNotReadyError,
   InvalidReceiptError,
   ProductAlreadyOwnedError,
@@ -19,8 +21,10 @@ import {
   UnknownCarModelError,
   UnknownUpgradeError,
   UpgradeMaxedError,
+  type ActiveEvent,
   type CarModelId,
   type BoosterId,
+  type EventKind,
   type ManagerId,
   type Mission,
   type MissionGoal,
@@ -46,6 +50,53 @@ export const UPGRADE_LABELS: Readonly<Record<UpgradeId, string>> = Object.freeze
   ads: "Publicité",
   wash: "Station de lavage",
 });
+
+export const EVENT_LABELS: Readonly<Record<EventKind, string>> = Object.freeze({
+  holidays: "Vacances scolaires",
+  carShow: "Salon de l'auto",
+  strike: "Grève des transports",
+  storm: "Tempête",
+});
+
+/** Short names for the HUD chip. */
+export const EVENT_SHORT_LABELS: Readonly<Record<EventKind, string>> = Object.freeze({
+  holidays: "Vacances",
+  carShow: "Salon",
+  strike: "Grève",
+  storm: "Tempête",
+});
+
+const multiplierFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
+
+function isEventKind(kind: unknown): kind is EventKind {
+  return typeof kind === "string" && (EVENT_KINDS as readonly string[]).includes(kind);
+}
+
+/** "Clients × 2", "Prix de référence + 30 %": what an event does. Never throws. */
+export function eventEffectText(kind: EventKind): string {
+  if (!isEventKind(kind)) return "Effet inconnu";
+  const spec = EVENTS[kind];
+  const parts: string[] = [];
+  if (Number.isFinite(spec.demandPct) && spec.demandPct > 0 && spec.demandPct !== 100) {
+    parts.push(`Clients × ${multiplierFormat.format(spec.demandPct / 100)}`);
+  }
+  if (Number.isFinite(spec.referencePct) && spec.referencePct > 0 && spec.referencePct !== 100) {
+    const delta = spec.referencePct - 100;
+    const sign = delta > 0 ? "+" : "−";
+    parts.push(`Prix de référence ${sign} ${multiplierFormat.format(Math.abs(delta))} %`);
+  }
+  return parts.length > 0 ? parts.join(", ") : "Aucun effet";
+}
+
+/** « Événement : Vacances scolaires — clients × 2 pendant 3 jours ». Never throws. */
+export function eventBannerText(event: ActiveEvent): string {
+  if (!isEventKind(event.kind)) return "Événement en cours";
+  const days = event.endDay - event.startDay;
+  const n = Number.isSafeInteger(days) && days >= 1 ? days : 1;
+  const effect = eventEffectText(event.kind);
+  const effectLower = effect.charAt(0).toLowerCase() + effect.slice(1);
+  return `Événement : ${EVENT_LABELS[event.kind]} — ${effectLower} pendant ${String(n)} jour${n > 1 ? "s" : ""}`;
+}
 
 export const PURCHASE_FAILED_ERROR =
   "Le paiement n'a pas pu démarrer. Vérifiez votre connexion et réessayez.";

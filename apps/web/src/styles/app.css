@@ -440,6 +440,56 @@ input {
   animation: pop var(--dur-base) var(--ease-spring);
 }
 
+/* Active event (events.md): a small pill at the start of the report line, so the HUD gains no row. */
+.event-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-right: var(--space-1);
+  padding: 1px 8px 1px 2px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--c-gold-300);
+  color: var(--c-ink);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  line-height: 1.3;
+  white-space: nowrap;
+  vertical-align: bottom;
+  box-shadow: var(--elev-1);
+  text-shadow: none;
+  cursor: pointer;
+  animation: pop var(--dur-slow) var(--ease-spring);
+}
+
+/* Tap target >= 44 px without making the pill taller. */
+.event-chip::after {
+  content: "";
+  position: absolute;
+  inset: -12px -6px;
+}
+
+.event-chip[data-kind="storm"],
+.event-chip[data-kind="strike"] {
+  background: var(--c-neutral-300);
+}
+
+.event-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--c-surface);
+}
+
+.event-chip-days {
+  font-variant-numeric: tabular-nums;
+}
+
 /* The dot between the sentence and the pill is only for plain-text readers. */
 .hud-sep {
   display: none;
@@ -784,14 +834,24 @@ input {
 }
 
 /* Toast "new day": a dark pill under the HUD with a time-left bar. */
-.day-banner-slot {
+.banner-stack {
   position: absolute;
   top: var(--inset-top, var(--hud-margin));
   left: calc(var(--space-3) + env(safe-area-inset-left));
-  right: calc(var(--space-3) + env(safe-area-inset-right));
+  /* Leaves the side rail (right edge, ~64 px) uncovered. */
+  right: calc(72px + env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  z-index: var(--z-toast);
+  pointer-events: none;
+}
+
+.day-banner-slot {
   display: flex;
   justify-content: center;
-  z-index: var(--z-toast);
+  max-width: 100%;
   pointer-events: none;
 }
 

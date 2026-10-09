@@ -35,7 +35,11 @@ export type IconName =
   | "shop"
   | "bolt"
   | "sound-on"
-  | "sound-off";
+  | "sound-off"
+  | "event-holidays"
+  | "event-show"
+  | "event-strike"
+  | "event-storm";
 
 export type IconSize = 16 | 20 | 24 | 32 | 40 | 48;
 
@@ -47,6 +51,34 @@ const SOLID = { fill: "currentColor", stroke: "none" } as const;
 
 function glyph(name: IconName): JSX.Element {
   switch (name) {
+    case "event-holidays":
+      return (
+        <>
+          <path d="M3.5 11.5a8.5 8.5 0 0 1 17 0z" {...SOFT} />
+          <path d="M12 11.5V20M9 20h6M8.2 11.5a4.6 6 0 0 1 3.8-8.2" />
+        </>
+      );
+    case "event-show":
+      return (
+        <path
+          d="M12 3.2l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.6l-5.2 2.8 1-5.9L3.5 9.4l5.9-.8z"
+          {...SOFT}
+        />
+      );
+    case "event-strike":
+      return (
+        <>
+          <path d="M8.4 3.5h7.2l4.9 4.9v7.2l-4.9 4.9H8.4l-4.9-4.9V8.4z" {...SOFT} />
+          <path d="M8 12h8" />
+        </>
+      );
+    case "event-storm":
+      return (
+        <>
+          <path d="M7 17a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17 8.6 4.2 4.2 0 0 1 17.5 17z" {...SOFT} />
+          <path d="M12.6 12.5l-2.2 3.2h3.2l-1.8 3.8" />
+        </>
+      );
     case "gem":
       return (
         <>

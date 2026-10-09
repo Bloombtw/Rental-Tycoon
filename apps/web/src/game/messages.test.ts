@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   CAR_MODEL_IDS,
+  EVENT_KINDS,
+  type ActiveEvent,
   FleetFullError,
   InsufficientCashError,
   InvalidDaysError,
@@ -15,7 +17,11 @@ import {
 import { formatCents } from "../format.js";
 import {
   CAR_MODEL_LABELS,
+  EVENT_LABELS,
+  EVENT_SHORT_LABELS,
   carStatusLabel,
+  eventBannerText,
+  eventEffectText,
   PRICE_FORMAT_ERROR,
   PRICE_RANGE_ERROR,
   errorMessage,
@@ -153,5 +159,47 @@ describe("carStatusLabel (random-demand.md)", () => {
     );
     expect(carStatusLabel({ rented: false })).toBe("Au parking");
     expect(carStatusLabel({ rented: false, outcome: "junk" })).toBe("Au parking");
+  });
+});
+
+describe("events", () => {
+  it("every kind has French labels and a clean effect text", () => {
+    for (const kind of EVENT_KINDS) {
+      expect(EVENT_LABELS[kind].length).toBeGreaterThan(0);
+      expect(EVENT_SHORT_LABELS[kind].length).toBeGreaterThan(0);
+      expect(clean(EVENT_LABELS[kind])).toBe(true);
+      expect(clean(eventEffectText(kind))).toBe(true);
+    }
+    expect(EVENT_LABELS.holidays).toBe("Vacances scolaires");
+    expect(EVENT_LABELS.carShow).toBe("Salon de l'auto");
+    expect(EVENT_LABELS.strike).toBe("Grève des transports");
+    expect(EVENT_LABELS.storm).toBe("Tempête");
+  });
+
+  it("effect texts follow the spec table", () => {
+    expect(eventEffectText("holidays")).toBe("Clients × 2");
+    expect(eventEffectText("carShow")).toBe("Prix de référence + 30 %");
+    expect(eventEffectText("strike")).toBe("Clients × 1,5");
+    expect(eventEffectText("storm")).toBe("Clients × 0,4");
+  });
+
+  it("banner text names the event, the effect and the duration (singular / plural)", () => {
+    expect(normalise(eventBannerText({ kind: "holidays", startDay: 4, endDay: 7 }))).toBe(
+      "Événement : Vacances scolaires — clients × 2 pendant 3 jours",
+    );
+    expect(eventBannerText({ kind: "storm", startDay: 4, endDay: 5 })).toBe(
+      "Événement : Tempête — clients × 0,4 pendant 1 jour",
+    );
+  });
+
+  it("forged input never renders junk", () => {
+    const bad = [
+      { kind: "nope", startDay: 1, endDay: 3 },
+      { kind: "holidays", startDay: Number.NaN, endDay: 3 },
+      { kind: "holidays", startDay: 5, endDay: 2 },
+      { kind: "storm", startDay: 1, endDay: Infinity },
+    ] as unknown as ActiveEvent[];
+    for (const e of bad) expect(clean(eventBannerText(e))).toBe(true);
+    expect(clean(eventEffectText("nope" as never))).toBe(true);
   });
 });

@@ -52,7 +52,7 @@ describe("constants", () => {
     expect(DEMAND_MIN_PCT).toBe(70);
     expect(DEMAND_MAX_PCT).toBe(115);
     expect(FIXTURE_REFERENCE_PRICE).toBe(90_00);
-    expect(GAME_STATE_VERSION).toBe(8); // v3 upgrades … v7 shop, v8 missions
+    expect(GAME_STATE_VERSION).toBe(9); // v3 upgrades … v7 shop, v8 missions, v9 events
     expect([...RENTAL_OUTCOMES]).toEqual(["rented", "tooExpensive", "noCustomer"]);
   });
 });
@@ -180,8 +180,10 @@ describe("daily customers", () => {
 });
 
 describe("rental rate (acceptance criteria 2 and 3)", () => {
-  function rentalRate(fleet: NewCar[], days: number, seed = 1): number {
+  function rentalRate(fleet: NewCar[], days: number, seed = 1, quiet = false): number {
     let g = createGame(seed, CASH, fleet);
+    // Events off: a car show raises the reference price (events.md).
+    if (quiet) g = { ...g, nextEventDay: Number.MAX_SAFE_INTEGER };
     let rented = 0;
     for (let d = 0; d < days; d++) {
       g = tick(g);
@@ -217,9 +219,10 @@ describe("rental rate (acceptance criteria 2 and 3)", () => {
   });
 
   it("at twice the advised price, nothing is ever rented", () => {
-    expect(rentalRate(fleetOf(20, 2 * 90_00), 200)).toBe(0);
-    expect(rentalRate(fleetOf(20, 3 * 90_00), 50)).toBe(0);
+    expect(rentalRate(fleetOf(20, 2 * 90_00), 200, 1, true)).toBe(0);
+    expect(rentalRate(fleetOf(20, 3 * 90_00), 50, 1, true)).toBe(0);
     let g = createGame(8, CASH, fleetOf(20, 60_00));
+    g = { ...g, nextEventDay: Number.MAX_SAFE_INTEGER };
     g = { ...g, fleet: g.fleet.map((c) => ({ ...c, model: "compact" as const })) };
     for (const c of g.fleet) g = setCarPrice(g, c.id, 2 * CAR_MODELS.compact.defaultDailyPrice);
     for (let d = 0; d < 100; d++) {
@@ -359,8 +362,8 @@ describe("save: version 2 (acceptance criterion 5)", () => {
     expect(() => restoreGameState(s, 2)).toThrow(InvalidGameStateError);
   });
 
-  // 92 = one above the most a day can draw (full fleet, max advertising, sales manager).
-  it.each([-1, 1.5, 92, 1e9, NaN, Infinity, null, "3", true, {}, [], 2 ** 53])(
+  // 183 = one above the most a day can draw (full fleet, max advertising, sales manager, holidays).
+  it.each([-1, 1.5, 183, 1e9, NaN, Infinity, null, "3", true, {}, [], 2 ** 53])(
     "rejects customersLeft = %s",
     (bad) => {
       const s = json(played());
